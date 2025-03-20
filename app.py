@@ -71,7 +71,7 @@ def main():
     inject_css()
 
     # Cabecera con logo (reemplaza la URL por el logo de tu empresa)
-    st.image("https://via.placeholder.com/1200x200.png?text=Company+Logo", use_column_width=True)
+    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", use_column_width=True)
     st.title("Análisis de Recursos Humanos")
     st.markdown("<h3 style='text-align: center; color: #6c757d;'>Análisis Integral de Datos</h3>", unsafe_allow_html=True)
     
