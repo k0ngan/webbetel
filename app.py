@@ -9,7 +9,7 @@ from analisis_hr import (
     attendance_analysis
 )
 
-# Inyección de CSS para una UI simple y limpia
+# Inyección de CSS para una interfaz simple y limpia
 def inject_css():
     st.markdown("""
     <style>
@@ -40,7 +40,7 @@ def main():
     inject_css()
     
     # Logo pequeño y título
-    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=80)
+    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=150)
     st.title("Análisis de Recursos Humanos")
     st.write("Seleccione su archivo de datos y el tipo de análisis deseado.")
     
@@ -50,32 +50,32 @@ def main():
                                           ["Datos Procesados", "Demográfico", "Contratos", "Salarial", "Asistencia"])
     
     if uploaded_file:
-        # Cargar y preparar los datos
         df = load_hr_data(uploaded_file)
         
-        # Se asume que la columna "Period" tiene valores en formato "aaaamm" (ej. "202201")
-        if 'Period' not in df.columns and 'ContractStartDate' in df.columns:
-            df['Period'] = df['ContractStartDate'].dt.strftime("%Y%m")
+        # Se asume que la columna "Período" tiene valores en formato "aaaamm" (ej. "202201").
+        # Si no existe "Período", se crea a partir de "ContractStartDate".
+        if 'Período' not in df.columns and 'ContractStartDate' in df.columns:
+            df['Período'] = df['ContractStartDate'].dt.strftime("%Y%m")
         
-        if 'Period' in df.columns:
-            df['Period'] = df['Period'].astype(str)
-            unique_years = sorted(set([p[:4] for p in df['Period'] if len(p) >= 6]))
-            unique_months = sorted(set([p[4:6] for p in df['Period'] if len(p) >= 6]))
+        if 'Período' in df.columns:
+            df['Período'] = df['Período'].astype(str)
+            unique_years = sorted(set([p[:4] for p in df['Período'] if len(p) >= 6]))
+            unique_months = sorted(set([p[4:6] for p in df['Período'] if len(p) >= 6]))
             
             st.sidebar.write("**Filtros por Período**")
             selected_year = st.sidebar.selectbox("Año", options=["Todos"] + unique_years)
             selected_month = st.sidebar.selectbox("Mes", options=["Todos"] + unique_months)
             
             if selected_year != "Todos":
-                df = df[df['Period'].str.startswith(selected_year)]
+                df = df[df['Período'].str.startswith(selected_year)]
             if selected_month != "Todos":
-                df = df[df['Period'].str.endswith(selected_month)]
+                df = df[df['Período'].str.endswith(selected_month)]
             
             if df.empty:
                 st.error("No hay datos para el período seleccionado.")
                 return
         
-        # Mostrar el análisis seleccionado
+        # Mostrar el análisis según la opción seleccionada
         if analysis_type == "Datos Procesados":
             st.subheader("Datos Procesados")
             st.dataframe(df)
