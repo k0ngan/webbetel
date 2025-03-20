@@ -9,74 +9,205 @@ from analisis_hr import (
     attendance_analysis
 )
 
-# Inyección de CSS personalizado para una UI moderna y profesional
-def inject_css():
-    st.markdown("""
-    <style>
-    /* Fondo degradado y fuente elegante */
-    .reportview-container {
-        background: linear-gradient(135deg, #f9f9f9 0%, #e0e0e0 100%);
-        font-family: 'Helvetica Neue', sans-serif;
-    }
-    /* Barra lateral con fondo blanco y borde sutil */
-    .sidebar .sidebar-content {
-        background: #ffffff;
-        border-right: 1px solid #d3d3d3;
-        padding: 20px;
-    }
-    /* Estilos para títulos */
-    h1 {
-        color: #343a40;
-        font-size: 2.5rem;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    h3 {
-        color: #495057;
-        margin-bottom: 1rem;
-    }
-    /* Estilos para tarjetas de contenido */
-    .card {
-        background: #ffffff;
-        border-radius: 8px;
-        padding: 20px;
-        margin-bottom: 20px;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-    }
-    /* Botones */
-    .stButton>button {
-        background-color: #007bff;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 0.5rem 1.5rem;
-        font-size: 1rem;
-    }
-    /* File uploader con estilo */
-    .stFileUploader {
-        background: #ffffff;
-        border: 2px dashed #007bff;
-        border-radius: 5px;
-        padding: 20px;
-    }
-    /* Personalización de selectboxes */
-    .stSelectbox {
-        border-radius: 5px;
-        border: 1px solid #ced4da;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Función para inyectar CSS dinámicamente según el tema seleccionado
+def inject_css(theme):
+    if theme == "Dark":
+        css = """
+            <style>
+            .reportview-container {
+                background: #121212;
+                color: #e0e0e0;
+                font-family: 'Helvetica Neue', sans-serif;
+            }
+            .sidebar .sidebar-content {
+                background: #1f1f1f;
+                border-right: 1px solid #444;
+                padding: 20px;
+            }
+            h1, h3 {
+                color: #bb86fc;
+            }
+            .card {
+                background: #1e1e1e;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0px 4px 12px rgba(0,0,0,0.3);
+                border: 1px solid #333;
+            }
+            .stButton>button {
+                background-color: #bb86fc;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5rem 1.5rem;
+                font-size: 1rem;
+            }
+            .stFileUploader {
+                background: #1e1e1e;
+                border: 2px dashed #bb86fc;
+                border-radius: 5px;
+                padding: 20px;
+            }
+            .stSelectbox {
+                border-radius: 5px;
+                border: 1px solid #444;
+            }
+            </style>
+        """
+    elif theme == "Light":
+        css = """
+            <style>
+            .reportview-container {
+                background: #ffffff;
+                color: #000000;
+                font-family: 'Helvetica Neue', sans-serif;
+            }
+            .sidebar .sidebar-content {
+                background: #ffffff;
+                border-right: 1px solid #d3d3d3;
+                padding: 20px;
+            }
+            h1, h3 {
+                color: #28a745;
+            }
+            .card {
+                background: #ffffff;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0px 4px 12px rgba(40, 167, 69, 0.1);
+                border: 1px solid #d4edda;
+            }
+            .stButton>button {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5rem 1.5rem;
+                font-size: 1rem;
+            }
+            .stFileUploader {
+                background: #ffffff;
+                border: 2px dashed #28a745;
+                border-radius: 5px;
+                padding: 20px;
+            }
+            .stSelectbox {
+                border-radius: 5px;
+                border: 1px solid #ced4da;
+            }
+            </style>
+        """
+    elif theme == "Blue":
+        css = """
+            <style>
+            .reportview-container {
+                background: #e7f0fd;
+                color: #0d1a26;
+                font-family: 'Helvetica Neue', sans-serif;
+            }
+            .sidebar .sidebar-content {
+                background: #ffffff;
+                border-right: 1px solid #b0c4de;
+                padding: 20px;
+            }
+            h1, h3 {
+                color: #1E90FF;
+            }
+            .card {
+                background: #ffffff;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0px 4px 12px rgba(30, 144, 255, 0.1);
+                border: 1px solid #b0c4de;
+            }
+            .stButton>button {
+                background-color: #1E90FF;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5rem 1.5rem;
+                font-size: 1rem;
+            }
+            .stFileUploader {
+                background: #ffffff;
+                border: 2px dashed #1E90FF;
+                border-radius: 5px;
+                padding: 20px;
+            }
+            .stSelectbox {
+                border-radius: 5px;
+                border: 1px solid #b0c4de;
+            }
+            </style>
+        """
+    elif theme == "Green":
+        css = """
+            <style>
+            .reportview-container {
+                background: #ffffff;
+                color: #000000;
+                font-family: 'Helvetica Neue', sans-serif;
+            }
+            .sidebar .sidebar-content {
+                background: #ffffff;
+                border-right: 1px solid #d3d3d3;
+                padding: 20px;
+            }
+            h1, h3 {
+                color: #28a745;
+            }
+            .card {
+                background: #ffffff;
+                border-radius: 8px;
+                padding: 20px;
+                margin-bottom: 20px;
+                box-shadow: 0px 4px 12px rgba(40, 167, 69, 0.1);
+                border: 1px solid #d4edda;
+            }
+            .stButton>button {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 0.5rem 1.5rem;
+                font-size: 1rem;
+            }
+            .stFileUploader {
+                background: #ffffff;
+                border: 2px dashed #28a745;
+                border-radius: 5px;
+                padding: 20px;
+            }
+            .stSelectbox {
+                border-radius: 5px;
+                border: 1px solid #ced4da;
+            }
+            </style>
+        """
+    else:
+        css = ""
+    st.markdown(css, unsafe_allow_html=True)
 
 def main():
-    inject_css()
+    # Selección del tema en la barra lateral
+    st.sidebar.header("Configuración de Tema")
+    theme = st.sidebar.selectbox(
+        "Seleccione el estilo de color de la página",
+        options=["Light", "Dark", "Blue", "Green"],
+        index=0
+    )
+    inject_css(theme)
 
-    # Cabecera con logo (reemplaza la URL por el logo de tu empresa)
-    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", use_column_width=True)
+    # Cabecera con logo reducido
+    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=200)
     st.title("Análisis de Recursos Humanos")
-    st.markdown("<h3 style='text-align: center; color: #6c757d;'>Análisis Integral de Datos</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center;'>Análisis Integral de Datos</h3>", unsafe_allow_html=True)
     
-    # Barra lateral para configuración y filtros
-    st.sidebar.header("Configuración")
+    # Barra lateral para configuración y filtros adicionales
+    st.sidebar.header("Opciones de Configuración")
     uploaded_file = st.sidebar.file_uploader("Suba su archivo de datos (CSV o Excel)", type=["csv", "xlsx"])
     
     analysis_type = st.sidebar.selectbox(
@@ -85,10 +216,9 @@ def main():
     )
     
     if uploaded_file is not None:
-        # Cargar datos usando la función de análisis
         df = load_hr_data(uploaded_file)
         
-        # Si no existe 'Period', se crea a partir de 'ContractStartDate'
+        # Si no existe la columna 'Period', se crea a partir de 'ContractStartDate'
         if 'Period' not in df.columns and 'ContractStartDate' in df.columns:
             df['Period'] = df['ContractStartDate'].dt.strftime("%Y%m")
             
@@ -115,7 +245,7 @@ def main():
         else:
             st.sidebar.warning("No se encontró la columna 'Period' para aplicar filtros.")
         
-        # Contenedor principal para mostrar resultados en tarjetas (cards)
+        # Mostrar análisis según la opción seleccionada
         if analysis_type == "Datos Procesados":
             st.markdown("<div class='card'><h3>Datos Procesados</h3></div>", unsafe_allow_html=True)
             st.dataframe(df)
@@ -138,10 +268,9 @@ def main():
     else:
         st.info("Por favor, suba un archivo de datos para comenzar el análisis.")
 
-    # Footer
     st.markdown("""
     <hr>
-    <p style="text-align: center; color: #6c757d;">© 2025 Su Empresa. Todos los derechos reservados.</p>
+    <p style="text-align: center;">© 2025 Su Empresa. Todos los derechos reservados.</p>
     """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
