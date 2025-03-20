@@ -40,7 +40,7 @@ def main():
     inject_css()
     
     # Logo pequeño y título
-    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=10)
+    st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=80)
     st.title("Análisis de Recursos Humanos")
     st.write("Seleccione su archivo de datos y el tipo de análisis deseado.")
     
