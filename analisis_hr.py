@@ -137,7 +137,7 @@ def load_hr_data(file_input):
         # Estandarizar los nombres de las columnas usando sinónimos
         df = standardize_column_names(df)
         
-        # Si existe la columna 'Faena', convertirla a string para evitar errores de tipo
+        # **Cambio Realizado:** Si existe la columna 'Faena', convertirla a string para evitar errores de tipo.
         if 'Faena' in df.columns:
             df['Faena'] = df['Faena'].fillna('').astype(str)
         
