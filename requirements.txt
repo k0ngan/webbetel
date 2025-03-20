@@ -1,4 +1,4 @@
-Flask
+streamlit
 pandas
 plotly
-openpyxl  # si vas a leer archivos Excel
+openpyxl
