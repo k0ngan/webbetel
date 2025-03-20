@@ -120,12 +120,13 @@ def load_hr_data(file_input):
         DataFrame: Datos procesados.
     """
     try:
-        # Obtener nombre del archivo (útil para file uploader de Streamlit)
+        # 1. Detectar el nombre del archivo (útil para file_uploader de Streamlit)
         if hasattr(file_input, 'name'):
             file_name = file_input.name
         else:
             file_name = str(file_input)
         
+        # 2. Cargar el DataFrame según la extensión
         if file_name.endswith('.csv'):
             df = pd.read_csv(file_input, delimiter=';', decimal=',', thousands='.')
         elif file_name.endswith(('.xlsx', '.xls')):
@@ -133,31 +134,48 @@ def load_hr_data(file_input):
         else:
             raise ValueError("Formato no soportado")
         
+        # 3. Estandarizar columnas según diccionario de sinónimos
         df = standardize_column_names(df)
         
-        # Si existe la columna 'Faena', convertirla a string para evitar errores
+        # 4. Manejo de columnas especiales
         if 'Faena' in df.columns:
             df['Faena'] = df['Faena'].fillna('').astype(str)
         
-        # Convertir columnas de fecha a datetime (si existen)
+        # 5. Convertir columnas de fecha
         date_cols = ['BirthDate', 'ContractStartDate', 'ContractEndDate']
         for col in date_cols:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
         
-        # Calcular campos derivados
+        # 6. Calcular TenureYears si TenureMonths existe
         if 'TenureMonths' in df.columns:
             df['TenureYears'] = df['TenureMonths'] / 12
         
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # NUEVO: Generar columna Age si no existe, pero sí tenemos BirthDate
+        if 'Age' not in df.columns and 'BirthDate' in df.columns:
+            today = pd.Timestamp.now()
+            df['Age'] = ((today - df['BirthDate']).dt.days // 365).astype(int)
+        
+        # NUEVO: Crear columna Nationality por defecto si no existe
+        if 'Nationality' not in df.columns:
+            df['Nationality'] = 'Desconocida'
+        # Si ya existe pero tiene valores nulos, los rellenamos
+        else:
+            df['Nationality'] = df['Nationality'].fillna('Desconocida')
+        # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        
+        # 7. Crear AgeGroup solo si tenemos la columna Age
         if 'Age' in df.columns:
             age_bins = [18, 25, 35, 45, 55, 65, 100]
             age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
             df['AgeGroup'] = pd.cut(df['Age'], bins=age_bins, labels=age_labels, right=False)
         
-        # Aplicar mapeo y normalización
+        # 8. Aplicar mapeo y normalización (Gender, AbsenceDays, etc.)
         df = normalize_and_map_data(df)
         
         return df
+    
     except Exception as e:
         print(f"Error cargando datos: {str(e)}")
         return None
