@@ -2,6 +2,7 @@
 """
 Análisis Integral de Datos de Recursos Humanos
 """
+
 # =============================================================================
 # 1. Importación de librerías
 # =============================================================================
@@ -66,43 +67,92 @@ COLUMN_MAPPING = {
 }
 
 # =============================================================================
-# 3. Funciones de carga y preparación de datos
+# 3. Función de mapeado y normalización
 # =============================================================================
-def load_hr_data(file_path):
+def normalize_and_map_data(df):
     """
-    Carga datos desde archivo Excel/CSV y realiza transformaciones iniciales
+    Aplica mapeo de valores y normaliza columnas numéricas específicas.
+    
+    Mapeos:
+      - 'Gender': 'F' -> 'Femenino', 'M' -> 'Masculino'
+    
+    Normalización (min-max) para columnas de asistencia:
+      - AbsenceDays, SickLeaveDays, RegularLeaveDays, MaternityLeaveDays, PermissionDays
+    """
+    # --- Mapeo de la columna de Género ---
+    gender_mapping = {'F': 'Femenino', 'M': 'Masculino'}
+    if 'Gender' in df.columns:
+        # Se mapean los valores y se mantienen los que no coinciden
+        df['Gender'] = df['Gender'].map(gender_mapping).fillna(df['Gender'])
+    
+    # --- Normalización de columnas específicas ---
+    cols_to_normalize = ['AbsenceDays', 'SickLeaveDays', 'RegularLeaveDays', 'MaternityLeaveDays', 'PermissionDays']
+    for col in cols_to_normalize:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            # Evitar división por cero si todos los valores son iguales
+            if max_val - min_val != 0:
+                df[f'Normalized_{col}'] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df[f'Normalized_{col}'] = 0.0
+    return df
+
+# =============================================================================
+# 4. Función de carga y preparación de datos
+# =============================================================================
+def load_hr_data(file_input):
+    """
+    Carga datos desde un objeto file uploader de Streamlit o una ruta de archivo,
+    y realiza las transformaciones iniciales:
+      - Carga desde CSV o Excel.
+      - Renombrado de columnas según COLUMN_MAPPING.
+      - Conversión de columnas de fecha.
+      - Cálculo de antigüedad en años.
+      - Creación de grupos de edad.
+      - Aplicación de mapeo de valores y normalización.
     
     Args:
-        file_path (str): Ruta del archivo de datos
+        file_input (file-like object or str): Archivo o ruta.
         
     Returns:
-        DataFrame: Datos procesados
+        DataFrame: Datos procesados.
     """
     try:
-        if file_path.endswith('.csv'):
-            df = pd.read_csv(file_path, delimiter=';', decimal=',', thousands='.')
-        elif file_path.endswith(('.xlsx', '.xls')):
-            df = pd.read_excel(file_path)
+        # Obtener el nombre del archivo si se trata de un objeto file uploader
+        if hasattr(file_input, 'name'):
+            file_name = file_input.name
+        else:
+            file_name = file_input
+
+        # Cargar datos desde CSV o Excel
+        if file_name.endswith('.csv'):
+            df = pd.read_csv(file_input, delimiter=';', decimal=',', thousands='.')
+        elif file_name.endswith(('.xlsx', '.xls')):
+            df = pd.read_excel(file_input)
         else:
             raise ValueError("Formato no soportado")
-            
-        # Renombrar columnas
+        
+        # Renombrar columnas según el mapeo definido
         df = df.rename(columns=COLUMN_MAPPING)
         
-        # Convertir fechas
+        # Convertir columnas de fecha a datetime
         date_cols = ['BirthDate', 'ContractStartDate', 'ContractEndDate']
         for col in date_cols:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
         
-        # Calcular campos derivados
+        # Calcular antigüedad en años a partir de la columna 'TenureMonths'
         if 'TenureMonths' in df.columns:
-            df['TenureYears'] = df['TenureMonths'] / 12  # Convertir meses a años
+            df['TenureYears'] = df['TenureMonths'] / 12  
             
-        # Crear grupos de edad
+        # Crear grupos de edad usando la columna 'Age'
         age_bins = [18, 25, 35, 45, 55, 65, 100]
         age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
         df['AgeGroup'] = pd.cut(df['Age'], bins=age_bins, labels=age_labels, right=False)
+        
+        # Aplicar mapeo y normalización a los datos
+        df = normalize_and_map_data(df)
         
         return df
     
@@ -111,7 +161,7 @@ def load_hr_data(file_path):
         return None
 
 # =============================================================================
-# 4. Funciones de análisis
+# 5. Funciones de análisis (sin modificaciones respecto a la funcionalidad de mapeo)
 # =============================================================================
 def demographic_analysis(df):
     """
@@ -141,7 +191,7 @@ def demographic_analysis(df):
     # Gráfico 1: Distribución por edad
     age_dist = df['AgeGroup'].value_counts().sort_index()
     fig.add_trace(
-        go.Bar(x=age_dist.index, y=age_dist.values, name='Edad'),
+        go.Bar(x=age_dist.index.astype(str), y=age_dist.values, name='Edad'),
         row=1, col=1
     )
     
@@ -155,7 +205,7 @@ def demographic_analysis(df):
     # Gráfico 3: Distribución por nacionalidad
     nationality_dist = df['Nationality'].value_counts()
     fig.add_trace(
-        go.Bar(x=nationality_dist.index, y=nationality_dist.values, name='Nacionalidad'),
+        go.Bar(x=nationality_dist.index.astype(str), y=nationality_dist.values, name='Nacionalidad'),
         row=2, col=1
     )
     
@@ -199,12 +249,13 @@ def contract_analysis(df):
     
     for contract in contract_dept.columns:
         fig.add_trace(
-            go.Bar(x=contract_dept.index, y=contract_dept[contract], name=contract),
+            go.Bar(x=contract_dept.index.astype(str), y=contract_dept[contract], name=contract),
             row=1, col=2
         )
     
     fig.update_layout(barmode='stack', title_text="Análisis de Contratos")
     return fig
+
 def salary_analysis(df):
     """Análisis de distribución salarial"""
     print("\n=== Análisis Salarial ===")
@@ -247,14 +298,17 @@ def salary_analysis(df):
     except Exception as e:
         print(f"Error en análisis salarial: {str(e)}")
         return px.scatter(title="Error en datos salariales")
+
 def attendance_analysis(df):
     """
-    Análisis de asistencia con manejo de columnas opcionales
+    Análisis de asistencia con manejo de columnas opcionales.
+    
+    Se calculan totales de licencias y se agrupan los datos por departamento.
     """
     print("\n=== Análisis de Asistencia ===")
     
     try:
-        # Lista de columnas posibles
+        # Lista de columnas posibles de licencia
         possible_columns = [
             'RegularLeaveDays',
             'MaternityLeaveDays',
@@ -262,18 +316,19 @@ def attendance_analysis(df):
             'PermissionDays'
         ]
         
-        # Filtrar columnas existentes
+        # Filtrar las columnas que existen en el DataFrame
         existing_columns = [col for col in possible_columns if col in df.columns]
         
-        # Calcular días totales de licencia
+        # Calcular el total de licencias sumando las columnas existentes
         if existing_columns:
             df['TotalLeave'] = df[existing_columns].sum(axis=1)
         else:
-            df['TotalLeave'] = 0  # Valor por defecto
-            
-        # Resto del análisis
+            df['TotalLeave'] = 0  # Valor por defecto si no existen
+        
+        # Agrupar por Departamento y calcular promedios de días trabajados, licencia total y días de falta
         attendance_dept = df.groupby('Department')[['DaysWorked', 'TotalLeave', 'AbsenceDays']].mean()
         
+        # Generar gráfico de barras para visualizar los promedios
         fig = px.bar(
             attendance_dept,
             barmode='group',
@@ -288,15 +343,11 @@ def attendance_analysis(df):
         return px.scatter(title="Error en datos de asistencia")
 
 # =============================================================================
-# 5. Ejecución principal
+# 6. Ejecución principal (para pruebas en entorno local)
 # =============================================================================
 if __name__ == "__main__":
-    # Cargar datos (reemplazar con tu ruta real)
-    # file_path = 'ruta/a/tu/archivo.xlsx'
-    # df = load_hr_data(file_path)
-    
-    # Para pruebas, generar datos de muestra
-    df = load_hr_data('sample_data.xlsx')  # Eliminar en producción
+    # Cargar datos (reemplazar 'sample_data.xlsx' por la ruta real de tus datos)
+    df = load_hr_data('sample_data.xlsx')
     
     if df is not None:
         # Ejecutar análisis
@@ -307,7 +358,7 @@ if __name__ == "__main__":
             attendance_analysis
         ]
         
-        # Generar y mostrar resultados
+        # Generar y mostrar resultados de cada análisis
         for analysis in analyses:
             try:
                 fig = analysis(df)
@@ -315,7 +366,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Error en {analysis.__name__}: {str(e)}")
                 
-        # Guardar datos procesados
+        # Guardar datos procesados en un archivo CSV
         df.to_csv('datos_procesados.csv', index=False)
         print("\nProceso completado. Datos guardados en 'datos_procesados.csv'")
     else:
