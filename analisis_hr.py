@@ -137,6 +137,10 @@ def load_hr_data(file_input):
         # Estandarizar los nombres de las columnas usando sinónimos
         df = standardize_column_names(df)
         
+        # Si existe la columna 'Faena', convertirla a string para evitar errores de tipo
+        if 'Faena' in df.columns:
+            df['Faena'] = df['Faena'].fillna('').astype(str)
+        
         # Convertir columnas de fecha a datetime (si existen)
         date_cols = ['BirthDate', 'ContractStartDate', 'ContractEndDate']
         for col in date_cols:
