@@ -67,12 +67,50 @@ COLUMN_MAPPING = {
 }
 
 # =============================================================================
-# 3. Funciones de carga y preparación de datos
+# 3. Función de mapeado y normalización
+# =============================================================================
+def normalize_and_map_data(df):
+    """
+    Aplica mapeo de valores y normaliza columnas numéricas específicas.
+    
+    Mapeos:
+      - 'Gender': 'F' -> 'Femenino', 'M' -> 'Masculino'
+    
+    Normalización (min-max) para columnas de asistencia:
+      - AbsenceDays, SickLeaveDays, RegularLeaveDays, MaternityLeaveDays, PermissionDays
+    """
+    # --- Mapeo de la columna de Género ---
+    gender_mapping = {'F': 'Femenino', 'M': 'Masculino'}
+    if 'Gender' in df.columns:
+        # Se mapean los valores y se mantienen los que no coinciden
+        df['Gender'] = df['Gender'].map(gender_mapping).fillna(df['Gender'])
+    
+    # --- Normalización de columnas específicas ---
+    cols_to_normalize = ['AbsenceDays', 'SickLeaveDays', 'RegularLeaveDays', 'MaternityLeaveDays', 'PermissionDays']
+    for col in cols_to_normalize:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            # Evitar división por cero si todos los valores son iguales
+            if max_val - min_val != 0:
+                df[f'Normalized_{col}'] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df[f'Normalized_{col}'] = 0.0
+    return df
+
+# =============================================================================
+# 4. Función de carga y preparación de datos
 # =============================================================================
 def load_hr_data(file_input):
     """
     Carga datos desde un objeto file uploader de Streamlit o una ruta de archivo,
-    y realiza las transformaciones iniciales.
+    y realiza las transformaciones iniciales:
+      - Carga desde CSV o Excel.
+      - Renombrado de columnas según COLUMN_MAPPING.
+      - Conversión de columnas de fecha.
+      - Cálculo de antigüedad en años.
+      - Creación de grupos de edad.
+      - Aplicación de mapeo de valores y normalización.
     
     Args:
         file_input (file-like object or str): Archivo o ruta.
@@ -87,6 +125,7 @@ def load_hr_data(file_input):
         else:
             file_name = file_input
 
+        # Cargar datos desde CSV o Excel
         if file_name.endswith('.csv'):
             df = pd.read_csv(file_input, delimiter=';', decimal=',', thousands='.')
         elif file_name.endswith(('.xlsx', '.xls')):
@@ -94,23 +133,26 @@ def load_hr_data(file_input):
         else:
             raise ValueError("Formato no soportado")
         
-        # Renombrar columnas
+        # Renombrar columnas según el mapeo definido
         df = df.rename(columns=COLUMN_MAPPING)
         
-        # Convertir columnas de fechas
+        # Convertir columnas de fecha a datetime
         date_cols = ['BirthDate', 'ContractStartDate', 'ContractEndDate']
         for col in date_cols:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
         
-        # Calcular campos derivados (por ejemplo, antigüedad en años)
+        # Calcular antigüedad en años a partir de la columna 'TenureMonths'
         if 'TenureMonths' in df.columns:
             df['TenureYears'] = df['TenureMonths'] / 12  
             
-        # Crear grupos de edad
+        # Crear grupos de edad usando la columna 'Age'
         age_bins = [18, 25, 35, 45, 55, 65, 100]
         age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
         df['AgeGroup'] = pd.cut(df['Age'], bins=age_bins, labels=age_labels, right=False)
+        
+        # Aplicar mapeo y normalización a los datos
+        df = normalize_and_map_data(df)
         
         return df
     
@@ -119,7 +161,7 @@ def load_hr_data(file_input):
         return None
 
 # =============================================================================
-# 4. Funciones de análisis
+# 5. Funciones de análisis (sin modificaciones respecto a la funcionalidad de mapeo)
 # =============================================================================
 def demographic_analysis(df):
     """
@@ -259,12 +301,14 @@ def salary_analysis(df):
 
 def attendance_analysis(df):
     """
-    Análisis de asistencia con manejo de columnas opcionales
+    Análisis de asistencia con manejo de columnas opcionales.
+    
+    Se calculan totales de licencias y se agrupan los datos por departamento.
     """
     print("\n=== Análisis de Asistencia ===")
     
     try:
-        # Lista de columnas posibles
+        # Lista de columnas posibles de licencia
         possible_columns = [
             'RegularLeaveDays',
             'MaternityLeaveDays',
@@ -272,18 +316,19 @@ def attendance_analysis(df):
             'PermissionDays'
         ]
         
-        # Filtrar columnas existentes
+        # Filtrar las columnas que existen en el DataFrame
         existing_columns = [col for col in possible_columns if col in df.columns]
         
-        # Calcular días totales de licencia
+        # Calcular el total de licencias sumando las columnas existentes
         if existing_columns:
             df['TotalLeave'] = df[existing_columns].sum(axis=1)
         else:
-            df['TotalLeave'] = 0  # Valor por defecto
-            
-        # Resto del análisis
+            df['TotalLeave'] = 0  # Valor por defecto si no existen
+        
+        # Agrupar por Departamento y calcular promedios de días trabajados, licencia total y días de falta
         attendance_dept = df.groupby('Department')[['DaysWorked', 'TotalLeave', 'AbsenceDays']].mean()
         
+        # Generar gráfico de barras para visualizar los promedios
         fig = px.bar(
             attendance_dept,
             barmode='group',
@@ -298,7 +343,7 @@ def attendance_analysis(df):
         return px.scatter(title="Error en datos de asistencia")
 
 # =============================================================================
-# 5. Ejecución principal (para pruebas en entorno local)
+# 6. Ejecución principal (para pruebas en entorno local)
 # =============================================================================
 if __name__ == "__main__":
     # Cargar datos (reemplazar 'sample_data.xlsx' por la ruta real de tus datos)
@@ -313,7 +358,7 @@ if __name__ == "__main__":
             attendance_analysis
         ]
         
-        # Generar y mostrar resultados
+        # Generar y mostrar resultados de cada análisis
         for analysis in analyses:
             try:
                 fig = analysis(df)
@@ -321,7 +366,7 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Error en {analysis.__name__}: {str(e)}")
                 
-        # Guardar datos procesados
+        # Guardar datos procesados en un archivo CSV
         df.to_csv('datos_procesados.csv', index=False)
         print("\nProceso completado. Datos guardados en 'datos_procesados.csv'")
     else:
