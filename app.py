@@ -47,31 +47,30 @@ def main():
     # Subida del archivo desde la barra lateral
     uploaded_file = st.sidebar.file_uploader("Suba su archivo (CSV o Excel)", type=["csv", "xlsx"])
     
-    if uploaded_file is not None:
+    if uploaded_file:
         df = load_hr_data(uploaded_file)
         
-        # Si no existe la columna 'Period', se intenta crear a partir de 'ContractStartDate'
-        if 'Period' not in df.columns and 'ContractStartDate' in df.columns:
-            df['ContractStartDate'] = pd.to_datetime(df['ContractStartDate'], errors='coerce')
-            df['Period'] = df['ContractStartDate'].dt.strftime("%Y%m")
+        # Se asume que la columna "Período" tiene valores en formato "aaaamm" (ej. "202201").
+        # Si no existe "Período", se crea a partir de "ContractStartDate".
+        if 'Período' not in df.columns and 'ContractStartDate' in df.columns:
+            df['Período'] = df['ContractStartDate'].dt.strftime("%Y%m")
         
-        # Aplicar filtros si se encontró la columna 'Period'
-        if 'Period' in df.columns:
-            df['Period'] = df['Period'].astype(str)
-            unique_years = sorted(set(p[:4] for p in df['Period'] if len(p) >= 4))
-            unique_months = sorted(set(p[4:6] for p in df['Period'] if len(p) >= 6))
+        if 'Período' in df.columns:
+            df['Período'] = df['Período'].astype(str)
+            unique_years = sorted(set([p[:4] for p in df['Período'] if len(p) >= 6]))
+            unique_months = sorted(set([p[4:6] for p in df['Período'] if len(p) >= 6]))
             
             st.sidebar.write("**Filtros por Período**")
             selected_year = st.sidebar.selectbox("Año", options=["Todos"] + unique_years)
             selected_month = st.sidebar.selectbox("Mes", options=["Todos"] + unique_months)
             
             if selected_year != "Todos":
-                df = df[df['Period'].str.startswith(selected_year)]
+                df = df[df['Período'].str.startswith(selected_year)]
             if selected_month != "Todos":
-                df = df[df['Period'].str.endswith(selected_month)]
+                df = df[df['Período'].str.endswith(selected_month)]
             
             if df.empty:
-                st.sidebar.error("No hay datos para el período seleccionado.")
+                st.error("No hay datos para el período seleccionado.")
                 return
         else:
             st.sidebar.write("No se encontró la columna 'Period' para aplicar el filtro de año y mes.")
