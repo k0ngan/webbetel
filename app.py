@@ -39,13 +39,15 @@ def inject_css():
 def main():
     inject_css()
     
-    # Logo y título
+    # Logo pequeño y título
     st.image("https://betel-website.s3.us-east-2.amazonaws.com/logos.png", width=150)
-    st.title("Análisis de Recursos Humanos - Implementaciones Actualizadas")
+    st.title("Análisis de Recursos Humanos")
     st.write("Seleccione su archivo de datos y el tipo de análisis deseado.")
     
-    # Subida del archivo desde la barra lateral
+    # Configuración en la barra lateral
     uploaded_file = st.sidebar.file_uploader("Suba su archivo (CSV o Excel)", type=["csv", "xlsx"])
+    analysis_type = st.sidebar.selectbox("Seleccione el análisis", 
+                                          ["Datos Procesados", "Demográfico", "Contratos", "Salarial", "Asistencia"])
     
     if uploaded_file:
         df = load_hr_data(uploaded_file)
