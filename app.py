@@ -16,7 +16,7 @@ def main():
     uploaded_file = st.file_uploader("Seleccione un archivo de datos", type=["csv", "xlsx"])
     
     if uploaded_file is not None:
-        # Cargar datos usando la función actualizada que aplica mapeo y normalización
+        # Cargar datos usando la función que aplica mapeo y normalización
         df = load_hr_data(uploaded_file)
         
         # Si no existe la columna 'Period', se intenta crear a partir de 'ContractStartDate'
@@ -30,10 +30,14 @@ def main():
             unique_years = sorted(set([p[:4] for p in df['Period'] if len(p) >= 4]))
             unique_months = sorted(set([p[4:6] for p in df['Period'] if len(p) >= 6]))
             
+            # Mostrar la cantidad de años disponibles en el Excel
+            st.write(f"El Excel contiene {len(unique_years)} años: {unique_years}")
+            
+            # Filtros para seleccionar año y mes a través de selectboxes
             selected_year = st.selectbox("Seleccione el año", options=["Todos"] + unique_years)
             selected_month = st.selectbox("Seleccione el mes", options=["Todos"] + unique_months)
             
-            # Filtrar el DataFrame según la selección
+            # Aplicar filtrado según la selección
             if selected_year != "Todos":
                 df = df[df['Period'].str.startswith(selected_year)]
             if selected_month != "Todos":
