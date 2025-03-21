@@ -13,7 +13,13 @@ from analisis_hr import (
     absenteeism_analysis,      # Se importa la función de ausentismo
     absenteeism_comparison     # Se importa la función para comparativa
 )
-
+# Configuración de página y tema
+st.set_page_config(
+    page_title="Análisis RRHH",
+    page_icon="👥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 #########################
 # Función de Convalidación de Licencias (Nuevo)
 #########################
