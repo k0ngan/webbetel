@@ -115,18 +115,7 @@ def normalize_and_map_data(df):
 # 4. Función de carga y preparación de datos
 # =============================================================================
 def load_hr_data(file_input):
-    """
-    Carga datos desde un archivo (CSV o Excel), estandariza los nombres de las columnas,
-    convierte las fechas, calcula campos derivados y aplica mapeo y normalización.
-    
-    Args:
-        file_input (file-like object or str): Archivo o ruta.
-        
-    Returns:
-        DataFrame: Datos procesados.
-    """
     try:
-        # Obtener nombre del archivo (útil para file uploader de Streamlit)
         if hasattr(file_input, 'name'):
             file_name = file_input.name
         else:
@@ -139,19 +128,19 @@ def load_hr_data(file_input):
         else:
             raise ValueError("Formato no soportado")
         
+        # Estandarizar nombres de columnas
         df = standardize_column_names(df)
+        # Eliminar columnas duplicadas (se conserva la primera aparición)
+        df = df.loc[:, ~df.columns.duplicated()]
         
-        # Si existe la columna 'Faena', convertirla a string para evitar errores
         if 'Faena' in df.columns:
             df['Faena'] = df['Faena'].fillna('').astype(str)
         
-        # Convertir columnas de fecha a datetime (si existen)
         date_cols = ['BirthDate', 'ContractStartDate', 'ContractEndDate']
         for col in date_cols:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], dayfirst=True, errors='coerce')
         
-        # Calcular campos derivados
         if 'TenureMonths' in df.columns:
             df['TenureYears'] = df['TenureMonths'] / 12
         if 'Age' in df.columns:
@@ -165,6 +154,7 @@ def load_hr_data(file_input):
     except Exception as e:
         print(f"Error cargando datos: {str(e)}")
         return None
+
 
 # =============================================================================
 # 5. Funciones de análisis
