@@ -32,24 +32,26 @@ sns.set_theme(style="whitegrid")
 # 2. Definición de sinónimos para la estandarización de nombres de columnas
 # =============================================================================
 STANDARD_COLUMN_SYNONYMS = {
-    'ContractID': ['contrato', 'contractid', 'contract'],
-    'NationalID': ['rut', 'nationalid', 'dni'],
-    'FullName': ['nombre completo', 'nombre', 'fullname', 'name'],
-    'JobRole': ['cargo', 'jobrole', 'position'],
-    'Gender': ['sexo', 'gender', 'genero'],
-    'BirthDate': ['fecha de nacimiento', 'birthdate', 'nacimiento'],
-    'Age': ['edad', 'age'],
-    'ContractType': ['tipo de contrato', 'contracttype', 'contract type'],
-    'ContractStartDate': ['fecha de inicio contrato', 'start date', 'fecha inicio'],
-    'ContractEndDate': ['fecha de término contrato', 'end date', 'fin contrato'],
-    'TenureMonths': ['antiguedad al corte de mes', 'tenure', 'antiguedad'],
-    'Department': ['gerencia', 'departamento', 'department'],
-    'RegularLeaveDays': ['dias de licencia normales', 'regularleavedays', 'licencia normales'],
-    'MaternityLeaveDays': ['dias de licencia maternales', 'maternityleavedays', 'licencia maternales'],
-    'SickLeaveDays': ['dias con licencia por accidente', 'sickleavedays', 'licencia por accidente'],
-    'PermissionDays': ['dias de permiso', 'permissiondays', 'permiso'],
-    'AbsenceDays': ['dias de falta', 'absencedays', 'falta'],
-    'BaseSalary': ['sueldo bruto contractual', 'basesalary', 'salario']
+    'ContractID': ['contrato'],
+    'NationalID': ['rut'],
+    'FullName': ['nombre completo'],
+    'JobRole': ['cargo'],
+    'ContractType': ['tipo de contrato', 'clasificación contrato'],
+    'Department': ['gerencia', 'gerencia presupuesto', 'sub gerencia'],
+    'BirthDate': ['fecha de nacimiento'],
+    'Age': ['edad', 'edad al corte de mes'],
+    'Gender': ['sexo'],
+    'ContractStartDate': ['fecha de inicio contrato'],
+    'ContractEndDate': ['fecha de término contrato'],
+    'TenureMonths': ['antiguedad al corte de mes'],
+    'Nationality': ['nación'],
+    'RegularLeaveDays': ['días de licencia normales'],
+    'MaternityLeaveDays': ['días de licencia maternales'],
+    'SickLeaveDays': ['dias con licencia por accidente'],
+    'PermissionDays': ['dias de permiso'],
+    'AbsenceDays': ['días de falta'],
+    'BaseSalary': ['sueldo bruto contractual'],
+    'DaysWorked': ['días trabajados']
 }
 
 # =============================================================================
