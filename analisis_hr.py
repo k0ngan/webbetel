@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Análisis Integral de Datos de Recursos Humanos con estandarización de columnas, normalización y funciones de reporte.
+Análisis Integral de Datos de Recursos Humanos
+Código combinado que incluye:
+  - Estandarización de columnas mediante sinónimos
+  - Normalización y mapeo de datos
+  - Carga y preparación de datos (CSV o Excel)
+  - Análisis: demográfico, contratos, salarial y asistencia
+  - Generación de resumen integral y reporte en HTML/JSON
 Compatible con app.py para dashboard de RRHH
 """
 
@@ -46,6 +52,9 @@ STANDARD_COLUMN_SYNONYMS = {
     'BaseSalary': ['sueldo bruto contractual', 'basesalary', 'salario']
 }
 
+# =============================================================================
+# 3. Funciones de normalización y estandarización
+# =============================================================================
 def normalize_string(s):
     """
     Normaliza un string: lo convierte a minúsculas, elimina espacios extremos y remueve acentos.
@@ -72,12 +81,9 @@ def standardize_column_names(df):
                 found = True
                 break
         if not found:
-            new_columns[col] = col  # Se mantiene el nombre original si no se encuentra coincidencia.
+            new_columns[col] = col
     return df.rename(columns=new_columns)
 
-# =============================================================================
-# 3. Función de mapeo y normalización de columnas numéricas
-# =============================================================================
 def normalize_and_map_data(df):
     """
     Aplica mapeo de valores y normaliza columnas numéricas específicas.
@@ -88,12 +94,10 @@ def normalize_and_map_data(df):
     Normalización (min-max) para columnas de asistencia:
       - AbsenceDays, SickLeaveDays, RegularLeaveDays, MaternityLeaveDays, PermissionDays
     """
-    # Mapeo de la columna Gender
     gender_mapping = {'F': 'Femenino', 'M': 'Masculino'}
     if 'Gender' in df.columns:
         df['Gender'] = df['Gender'].map(gender_mapping).fillna(df['Gender'])
     
-    # Normalización de columnas de asistencia
     cols_to_normalize = ['AbsenceDays', 'SickLeaveDays', 'RegularLeaveDays', 'MaternityLeaveDays', 'PermissionDays']
     for col in cols_to_normalize:
         if col in df.columns:
@@ -148,13 +152,11 @@ def load_hr_data(file_input):
         # Calcular campos derivados
         if 'TenureMonths' in df.columns:
             df['TenureYears'] = df['TenureMonths'] / 12
-        
         if 'Age' in df.columns:
             age_bins = [18, 25, 35, 45, 55, 65, 100]
             age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
             df['AgeGroup'] = pd.cut(df['Age'], bins=age_bins, labels=age_labels, right=False)
         
-        # Aplicar mapeo y normalización
         df = normalize_and_map_data(df)
         
         return df
@@ -163,11 +165,12 @@ def load_hr_data(file_input):
         return None
 
 # =============================================================================
-# 5. Funciones de análisis para los diferentes aspectos (ya existentes para app.py)
+# 5. Funciones de análisis
 # =============================================================================
 def demographic_analysis(df):
     """
-    Análisis demográfico: Distribución de edad, género y otros indicadores.
+    Análisis demográfico: Distribución de edad, género, nacionalidad y antigüedad.
+    
     Retorna:
         plotly.graph_objects.Figure: Figura para el dashboard.
     """
@@ -184,34 +187,23 @@ def demographic_analysis(df):
     )
     if 'AgeGroup' in df.columns:
         age_dist = df['AgeGroup'].value_counts().sort_index()
-        fig.add_trace(
-            go.Bar(x=age_dist.index.astype(str), y=age_dist.values, name='Edad'),
-            row=1, col=1
-        )
+        fig.add_trace(go.Bar(x=age_dist.index.astype(str), y=age_dist.values, name='Edad'), row=1, col=1)
     if 'Gender' in df.columns:
         gender_dist = df['Gender'].value_counts()
-        fig.add_trace(
-            go.Pie(labels=gender_dist.index, values=gender_dist.values, name='Género'),
-            row=1, col=2
-        )
+        fig.add_trace(go.Pie(labels=gender_dist.index, values=gender_dist.values, name='Género'), row=1, col=2)
     if 'Nationality' in df.columns:
         nat_dist = df['Nationality'].value_counts()
-        fig.add_trace(
-            go.Bar(x=nat_dist.index.astype(str), y=nat_dist.values, name='Nacionalidad'),
-            row=2, col=1
-        )
+        fig.add_trace(go.Bar(x=nat_dist.index.astype(str), y=nat_dist.values, name='Nacionalidad'), row=2, col=1)
     if 'Gender' in df.columns and 'TenureYears' in df.columns:
         tenure_by_gender = df.groupby('Gender')['TenureYears'].mean()
-        fig.add_trace(
-            go.Bar(x=tenure_by_gender.index, y=tenure_by_gender.values, name='Antigüedad'),
-            row=2, col=2
-        )
+        fig.add_trace(go.Bar(x=tenure_by_gender.index, y=tenure_by_gender.values, name='Antigüedad'), row=2, col=2)
     fig.update_layout(height=800, showlegend=False, title_text="Análisis Demográfico")
     return fig
 
 def contract_analysis(df):
     """
     Análisis de tipos de contrato y su distribución.
+    
     Retorna:
         plotly.graph_objects.Figure: Figura para el dashboard.
     """
@@ -226,21 +218,16 @@ def contract_analysis(df):
         specs=[[{'type': 'pie'}, {'type': 'bar'}]],
         subplot_titles=('Distribución de Contratos', 'Contratos por Departamento')
     )
-    fig.add_trace(
-        go.Pie(labels=contract_dist.index, values=contract_dist.values),
-        row=1, col=1
-    )
+    fig.add_trace(go.Pie(labels=contract_dist.index, values=contract_dist.values), row=1, col=1)
     for contract in contract_dept.columns:
-        fig.add_trace(
-            go.Bar(x=contract_dept.index.astype(str), y=contract_dept[contract], name=contract),
-            row=1, col=2
-        )
+        fig.add_trace(go.Bar(x=contract_dept.index.astype(str), y=contract_dept[contract], name=contract), row=1, col=2)
     fig.update_layout(barmode='stack', title_text="Análisis de Contratos")
     return fig
 
 def salary_analysis(df):
     """
     Análisis de distribución salarial.
+    
     Retorna:
         plotly.express.Figure: Gráfico sunburst con distribución salarial por departamento.
     """
@@ -270,6 +257,7 @@ def salary_analysis(df):
 def attendance_analysis(df):
     """
     Análisis de asistencia: calcula totales de licencias y agrupa por departamento.
+    
     Retorna:
         plotly.express.Figure: Gráfico de barras con patrones de asistencia.
     """
@@ -295,11 +283,12 @@ def attendance_analysis(df):
         return px.scatter(title="Error en datos de asistencia")
 
 # =============================================================================
-# 6. Funciones adicionales para un análisis integral y generación de reportes
+# 6. Funciones adicionales para análisis integral y generación de reportes
 # =============================================================================
 def generate_hr_overview(df):
     """
     Genera un resumen con indicadores clave de RRHH.
+    
     Retorna:
         dict: Resumen con total de empleados, edad promedio, salario promedio, etc.
     """
@@ -323,12 +312,13 @@ def generate_hr_overview(df):
     if 'DaysWorked' in df.columns and 'AbsenceDays' in df.columns:
         total_worked = df['DaysWorked'].sum()
         total_absence = df['AbsenceDays'].sum()
-        overview['attendance_ratio'] = total_worked / (total_worked + total_absence)
+        overview['attendance_ratio'] = total_worked / (total_worked + total_absence) if (total_worked + total_absence) != 0 else None
     return overview
 
 def analyze_hr_data(df):
     """
     Integra los distintos análisis y retorna un diccionario con todos los resultados.
+    
     Retorna:
         dict: Con claves 'overview', 'demographic', 'contracts', 'salary' y 'attendance'.
     """
@@ -343,10 +333,12 @@ def analyze_hr_data(df):
 def export_analysis_report(df, results, format='html'):
     """
     Exporta el reporte del análisis a un formato específico (por ejemplo, HTML o JSON).
+    
     Args:
         df (DataFrame): Datos procesados.
         results (dict): Resultados de los análisis.
         format (str): 'html' o 'json'.
+        
     Retorna:
         str: Reporte en el formato solicitado.
     """
@@ -367,7 +359,6 @@ def export_analysis_report(df, results, format='html'):
             for key, value in overview.items():
                 html_report.write(f"<p><strong>{key.replace('_', ' ').capitalize()}:</strong> {value}</p>")
             html_report.write("</div>")
-            # Se pueden agregar las visualizaciones (usando .to_html() de Plotly) si se desea.
             html_report.write("</body></html>")
             return html_report.getvalue()
         elif format == 'json':
@@ -387,20 +378,23 @@ if __name__ == "__main__":
     df = load_hr_data('sample_data.xlsx')
     if df is not None:
         print("Datos cargados y procesados correctamente.")
-        # Ejemplo de análisis integral
+        # Análisis integral
         results = analyze_hr_data(df)
         print("\nResumen General:")
         for key, value in results['overview'].items():
             print(f"{key}: {value}")
-        # Mostrar gráficos (si se ejecuta en entorno gráfico)
+        # Mostrar gráficos (se abrirán en ventanas si se ejecuta en entorno gráfico)
         results['demographic'].show()
         results['contracts'].show()
         results['salary'].show()
         results['attendance'].show()
-        # Exportar reporte HTML (puedes usarlo para descarga en app.py)
+        # Exportar reporte HTML
         reporte_html = export_analysis_report(df, results, format='html')
         with open('reporte_rrhh.html', 'w', encoding='utf-8') as f:
             f.write(reporte_html)
+        # Guardar datos procesados en CSV
+        df.to_csv('datos_procesados.csv', index=False)
         print("\nReporte generado: 'reporte_rrhh.html'")
+        print("Datos procesados guardados en 'datos_procesados.csv'")
     else:
         print("Error: No se pudo cargar el archivo de datos")
