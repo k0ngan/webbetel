@@ -7,6 +7,9 @@ Código combinado que incluye:
   - Carga y preparación de datos (CSV o Excel)
   - Análisis: demográfico, contratos, salarial y asistencia
   - Generación de resumen integral y reporte en HTML/JSON
+  - NUEVAS FUNCIONES: análisis de Licencias Médicas Electrónicas (LME)
+  - NUEVA FUNCIÓN: análisis de Ausentismo (absenteeism_analysis)
+  - NUEVA FUNCIÓN: comparativa de Ausentismo entre dos períodos (absenteeism_comparison)
 Compatible con app.py para dashboard de RRHH
 """
 
@@ -115,6 +118,9 @@ def normalize_and_map_data(df):
 # 4. Función de carga y preparación de datos
 # =============================================================================
 def load_hr_data(file_input):
+    """
+    Carga datos desde CSV o Excel, estandariza nombres de columnas y normaliza datos
+    """
     try:
         if hasattr(file_input, 'name'):
             file_name = file_input.name
@@ -143,6 +149,7 @@ def load_hr_data(file_input):
         
         if 'TenureMonths' in df.columns:
             df['TenureYears'] = df['TenureMonths'] / 12
+        
         if 'Age' in df.columns:
             age_bins = [18, 25, 35, 45, 55, 65, 100]
             age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
@@ -155,16 +162,13 @@ def load_hr_data(file_input):
         print(f"Error cargando datos: {str(e)}")
         return None
 
-
 # =============================================================================
-# 5. Funciones de análisis
+# 5. Funciones de análisis (demográfico, contratos, salarial, asistencia)
 # =============================================================================
 def demographic_analysis(df):
     """
     Análisis demográfico: Distribución de edad, género, nacionalidad y antigüedad.
-    
-    Retorna:
-        plotly.graph_objects.Figure: Figura para el dashboard.
+    Retorna una figura Plotly.
     """
     fig = make_subplots(
         rows=2, cols=2,
@@ -194,10 +198,7 @@ def demographic_analysis(df):
 
 def contract_analysis(df):
     """
-    Análisis de tipos de contrato y su distribución.
-    
-    Retorna:
-        plotly.graph_objects.Figure: Figura para el dashboard.
+    Análisis de contratos.
     """
     if 'ContractType' not in df.columns or 'Department' not in df.columns:
         return go.Figure().update_layout(title="Datos insuficientes para análisis de contratos")
@@ -218,10 +219,7 @@ def contract_analysis(df):
 
 def salary_analysis(df):
     """
-    Análisis de distribución salarial.
-    
-    Retorna:
-        plotly.express.Figure: Gráfico sunburst con distribución salarial por departamento.
+    Análisis salarial.
     """
     try:
         if 'Department' not in df.columns or 'BaseSalary' not in df.columns:
@@ -248,42 +246,274 @@ def salary_analysis(df):
 
 def attendance_analysis(df):
     """
-    Análisis de asistencia: calcula totales de licencias y agrupa por departamento.
-    
-    Retorna:
-        plotly.express.Figure: Gráfico de barras con patrones de asistencia.
+    Análisis de asistencia.
     """
     try:
-        possible_columns = ['RegularLeaveDays', 'MaternityLeaveDays', 'SickLeaveDays', 'PermissionDays']
-        existing_columns = [col for col in possible_columns if col in df.columns]
-        if existing_columns:
-            df['TotalLeave'] = df[existing_columns].sum(axis=1)
+        leave_columns = ['RegularLeaveDays', 'MaternityLeaveDays', 'SickLeaveDays', 'PermissionDays']
+        existing_leave = [col for col in leave_columns if col in df.columns]
+        if existing_leave:
+            df['TotalLeave'] = df[existing_leave].sum(axis=1)
         else:
             df['TotalLeave'] = 0
-        if 'Department' not in df.columns or 'DaysWorked' not in df.columns or 'AbsenceDays' not in df.columns:
-            raise ValueError("Columnas necesarias para análisis de asistencia no encontradas")
-        attendance_dept = df.groupby('Department')[['DaysWorked', 'TotalLeave', 'AbsenceDays']].mean()
-        fig = px.bar(
-            attendance_dept,
-            barmode='group',
-            title='Patrones de Asistencia por Departamento',
-            labels={'value': 'Días', 'variable': 'Tipo'}
-        )
+
+        if 'VacationDays' not in df.columns:
+            df['VacationDays'] = 0
+
+        required = ['Department', 'DaysWorked', 'AbsenceDays']
+        for col in required:
+            if col not in df.columns:
+                raise ValueError(f"No se encontró la columna requerida: {col}")
+        
+        attendance_dept = df.groupby('Department')[['DaysWorked', 'AbsenceDays', 'VacationDays']].mean().reset_index()
+        fig = px.bar(attendance_dept, x='Department', y=['DaysWorked', 'AbsenceDays', 'VacationDays'],
+                     barmode='group', title='Patrones de Asistencia por Departamento',
+                     labels={'value': 'Días', 'variable': 'Tipo'})
         return fig
     except Exception as e:
         print(f"Error en análisis de asistencia: {str(e)}")
         return px.scatter(title="Error en datos de asistencia")
 
 # =============================================================================
+# 5bis. Funciones para análisis de Licencias Médicas Electrónicas (LME)
+# =============================================================================
+def analyze_total_LME(df):
+    total = df.groupby(['Año', 'Tipo de Licencia'])['Cantidad'].sum().reset_index()
+    pivot = total.pivot(index='Tipo de Licencia', columns='Año', values='Cantidad').reset_index()
+    if 2023 in pivot.columns and 2024 in pivot.columns:
+        pivot['Variación %'] = ((pivot[2024] - pivot[2023]) / pivot[2023]) * 100
+    fig = px.bar(total, x='Tipo de Licencia', y='Cantidad', color='Año', barmode='group',
+                 title="LME emitidas por Tipo y Año")
+    return pivot, fig
+
+def analyze_LME_por_seguro(df):
+    df_tipo1 = df[df['Tipo de Licencia'] == "Enfermedad o Accidente Común"]
+    seguro = df_tipo1.groupby(['Seguro', 'Año'])['Cantidad'].sum().reset_index()
+    pivot = seguro.pivot(index='Seguro', columns='Año', values='Cantidad').reset_index()
+    if 2023 in pivot.columns and 2024 in pivot.columns:
+        pivot['Variación %'] = ((pivot[2024] - pivot[2023]) / pivot[2023]) * 100
+    fig = px.bar(seguro, x='Seguro', y='Cantidad', color='Año', barmode='group',
+                 title="LME 'Enfermedad o Accidente Común' por Seguro")
+    return pivot, fig
+
+def analyze_trabajadores_LME(df):
+    if 'TrabajadorID' not in df.columns:
+        return None, None
+    unique = df[df['Tipo de Licencia'] == "Enfermedad o Accidente Común"]\
+                .groupby(['Seguro', 'Año'])['TrabajadorID'].nunique().reset_index()
+    pivot = unique.pivot(index='Seguro', columns='Año', values='TrabajadorID').reset_index()
+    if 2023 in pivot.columns and 2024 in pivot.columns:
+        pivot['Variación %'] = ((pivot[2024] - pivot[2023]) / pivot[2023]) * 100
+    fig = px.bar(unique, x='Seguro', y='TrabajadorID', color='Año', barmode='group',
+                 title="Trabajadores Únicos por Seguro")
+    return pivot, fig
+
+def analyze_estado_resolucion_LME(df):
+    estado = df.groupby(['Año', 'Estado Resolución', 'Seguro'])['Cantidad'].sum().reset_index()
+    total_por_seguro = df.groupby(['Año', 'Seguro'])['Cantidad'].sum().reset_index().rename(columns={'Cantidad':'Total'})
+    rechazados = df[df['Estado Resolución'] == "Rechazase"].groupby(['Año', 'Seguro'])['Cantidad'].sum().reset_index().rename(columns={'Cantidad':'Rechazados'})
+    tasa = pd.merge(total_por_seguro, rechazados, on=['Año', 'Seguro'], how='left')
+    tasa['Rechazados'] = tasa['Rechazados'].fillna(0)
+    tasa['Tasa Rechazo (%)'] = (tasa['Rechazados'] / tasa['Total']) * 100
+    fig = px.bar(tasa, x='Seguro', y='Tasa Rechazo (%)', color='Año', barmode='group',
+                 title="Tasa de Rechazo por Seguro")
+    return estado, fig
+
+def analyze_grupo_diagnostico_LME(df):
+    grupo = df.groupby(['Año', 'Grupo Diagnostico'])['Cantidad'].sum().reset_index()
+    pivot = grupo.pivot(index='Grupo Diagnostico', columns='Año', values='Cantidad').reset_index()
+    if 2023 in pivot.columns and 2024 in pivot.columns:
+        pivot['Variación %'] = ((pivot[2024] - pivot[2023]) / pivot[2023]) * 100
+    fig = px.bar(grupo, x='Grupo Diagnostico', y='Cantidad', color='Año', barmode='group',
+                 title="LME por Grupo Diagnóstico")
+    return pivot, fig
+
+def analyze_duracion_LME(df):
+    duracion = df.groupby(['Año', 'Grupo Diagnostico'])['DiasAutorizados'].mean().reset_index()
+    fig = px.bar(duracion, x='Grupo Diagnostico', y='DiasAutorizados', color='Año', barmode='group',
+                 title="Duración Promedio de LME por Grupo Diagnóstico")
+    return duracion, fig
+
+# =============================================================================
+# NUEVA FUNCIÓN: Análisis de Ausentismo
+# =============================================================================
+def absenteeism_analysis(df):
+    """
+    Análisis de Ausentismo mejorado:
+      - Agrega días de ausentismo por 'Período' (YYYYMM) y calcula porcentajes.
+      - Formatea el período a "Mes Año" (en español).
+      - Genera:
+         * Un gráfico de barras apiladas con los días de ausencia por tipo.
+         * Un gráfico de línea con la evolución total de ausentismo.
+         * Dos gráficos de pastel (uno absoluto y otro porcentual) para el período más reciente.
+      - Retorna la tabla agregada, una tupla de figuras (barras, línea, diccionario de pastel) y un texto resumen.
+    """
+
+    if 'Período' not in df.columns:
+        if 'ContractStartDate' in df.columns:
+            df['Período'] = df['ContractStartDate'].dt.strftime("%Y%m")
+        else:
+            raise ValueError("No se encontró la columna 'Período' ni 'ContractStartDate' para el análisis de ausentismo.")
+    
+    absence_cols = []
+    for col in ['AbsenceDays', 'SickLeaveDays', 'RegularLeaveDays', 'MaternityLeaveDays', 'PermissionDays']:
+        if col in df.columns:
+            absence_cols.append(col)
+    if not absence_cols:
+        return None, (None, None, {}), "No se encontraron columnas de ausentismo."
+
+    agg_df = df.groupby('Período')[absence_cols].sum().reset_index()
+    agg_df['TotalAusentismo'] = agg_df[absence_cols].sum(axis=1)
+
+    for col in absence_cols:
+        agg_df[f"{col}_pct"] = (agg_df[col] / agg_df['TotalAusentismo']) * 100
+
+    month_map = {
+        "01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+        "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+        "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"
+    }
+
+    def format_period(yyyymm):
+        if len(yyyymm) == 6:
+            year = yyyymm[:4]
+            month = yyyymm[4:]
+            return f"{month_map.get(month, month)} {year}"
+        else:
+            return yyyymm
+
+    agg_df['Período_formateado'] = agg_df['Período'].apply(format_period)
+
+    # Gráfico de barras apiladas
+    df_melted = agg_df.melt(
+        id_vars=['Período_formateado', 'TotalAusentismo'],
+        value_vars=absence_cols,
+        var_name='TipoAusencia',
+        value_name='DiasAusencia'
+    )
+    fig_stacked = px.bar(
+        df_melted,
+        x='Período_formateado',
+        y='DiasAusencia',
+        color='TipoAusencia',
+        title="Días de Ausentismo por Tipo (Barras Apiladas)",
+        labels={'DiasAusencia': 'Días de Ausencia', 'Período_formateado': 'Período'},
+    )
+    fig_stacked.update_layout(xaxis_title="Período", yaxis_title="Días de Ausencia", barmode='stack')
+
+    # Gráfico de línea
+    fig_total_line = px.line(
+        agg_df,
+        x='Período_formateado',
+        y='TotalAusentismo',
+        markers=True,
+        title="Evolución del Total de Ausentismo",
+        labels={'TotalAusentismo': 'Días de Ausentismo', 'Período_formateado': 'Período'}
+    )
+    fig_total_line.update_layout(xaxis_title="Período", yaxis_title="Días de Ausentismo")
+
+    # Gráficos de pastel para el período más reciente
+    selected_row = agg_df.iloc[-1]
+    pie_data_absolute = {col: selected_row[col] for col in absence_cols}
+    pie_data_percent = {col: selected_row[f"{col}_pct"] for col in absence_cols}
+
+    fig_pie_absolute = px.pie(
+        names=list(pie_data_absolute.keys()),
+        values=list(pie_data_absolute.values()),
+        title=f"Distribución Absoluta en {selected_row['Período_formateado']}"
+    )
+    fig_pie_percent = px.pie(
+        names=list(pie_data_percent.keys()),
+        values=list(pie_data_percent.values()),
+        title=f"Distribución Porcentual en {selected_row['Período_formateado']}"
+    )
+    pie_dict = {"Absoluta": fig_pie_absolute, "Porcentual": fig_pie_percent}
+
+    total_ausentismo = agg_df['TotalAusentismo'].sum()
+    idx_max = agg_df['TotalAusentismo'].idxmax()
+    idx_min = agg_df['TotalAusentismo'].idxmin()
+    periodo_max = agg_df.loc[idx_max, 'Período_formateado']
+    valor_max = agg_df.loc[idx_max, 'TotalAusentismo']
+    periodo_min = agg_df.loc[idx_min, 'Período_formateado']
+    valor_min = agg_df.loc[idx_min, 'TotalAusentismo']
+
+    resumen_global = f"""
+**Resumen Global de Ausentismo**  
+- **Total de días de ausentismo:** {total_ausentismo:.0f}  
+- **Período con mayor ausentismo:** {periodo_max} ({valor_max:.0f} días)  
+- **Período con menor ausentismo:** {periodo_min} ({valor_min:.0f} días)
+    """
+    predominant_type = max(pie_data_percent, key=pie_data_percent.get)
+    predominant_percentage = pie_data_percent[predominant_type]
+    resumen_periodo = f"En {selected_row['Período_formateado']}, el tipo de ausencia predominante fue **{predominant_type}** con un **{predominant_percentage:.1f}%**."
+    texto_resumen = resumen_global + "\n" + resumen_periodo
+
+    return agg_df, (fig_stacked, fig_total_line, pie_dict), texto_resumen
+
+# =============================================================================
+# NUEVA FUNCIÓN: Comparativa de Ausentismo entre dos períodos
+# =============================================================================
+def absenteeism_comparison(agg_df, period1, period2):
+    """
+    Compara dos períodos de ausentismo a partir del DataFrame agregado (agg_df) generado por absenteeism_analysis.
+    period1 y period2 deben ser cadenas en formato YYYYMM.
+    
+    Retorna:
+      - DataFrame comparativo con los valores absolutos y porcentuales por tipo.
+      - Figura comparativa (barras agrupadas) que muestra los días de ausencia por tipo para ambos períodos.
+      - Texto resumen que indica las principales diferencias estadísticas.
+    """
+    comp1 = agg_df[agg_df['Período'] == period1]
+    comp2 = agg_df[agg_df['Período'] == period2]
+    
+    if comp1.empty or comp2.empty:
+        raise ValueError("Uno o ambos de los períodos seleccionados no existen en los datos.")
+    
+    comp1 = comp1.iloc[0]
+    comp2 = comp2.iloc[0]
+    
+    comparison_data = []
+    absence_cols = [col for col in ['AbsenceDays', 'SickLeaveDays', 'RegularLeaveDays', 'MaternityLeaveDays', 'PermissionDays'] if col in agg_df.columns]
+    for col in absence_cols:
+        val1 = comp1[col]
+        val2 = comp2[col]
+        pct1 = comp1[f"{col}_pct"]
+        pct2 = comp2[f"{col}_pct"]
+        diff = val2 - val1
+        diff_pct = ((val2 - val1) / val1 * 100) if val1 != 0 else None
+        comparison_data.append({
+            "TipoAusencia": col,
+            f"{period1}": val1,
+            f"{period2}": val2,
+            "Diferencia": diff,
+            "Diferencia (%)": diff_pct,
+            f"{period1}_pct": pct1,
+            f"{period2}_pct": pct2,
+        })
+    comp_df = pd.DataFrame(comparison_data)
+    
+    comp_fig = px.bar(comp_df, x="TipoAusencia", y=[f"{period1}", f"{period2}"],
+                      barmode="group", title="Comparativa de Ausentismo por Tipo",
+                      labels={"value": "Días de Ausentismo", "variable": "Período"})
+    
+    total1 = comp1['TotalAusentismo']
+    total2 = comp2['TotalAusentismo']
+    total_diff = total2 - total1
+    total_diff_pct = ((total2 - total1) / total1 * 100) if total1 != 0 else None
+    resumen = f"Comparación entre {comp1['Período_formateado']} y {comp2['Período_formateado']}:\n"
+    resumen += f"- Total de ausentismo en {comp1['Período_formateado']}: {total1:.0f} días.\n"
+    resumen += f"- Total de ausentismo en {comp2['Período_formateado']}: {total2:.0f} días.\n"
+    resumen += f"- Diferencia total: {total_diff:.0f} días ({total_diff_pct:.1f}% {'aumento' if total_diff_pct and total_diff_pct>0 else 'disminución'}).\n"
+    for item in comparison_data:
+        diff_pct = item["Diferencia (%)"]
+        if diff_pct is not None and abs(diff_pct) > 10:
+            resumen += f"- En {item['TipoAusencia']}, se observó una diferencia de {diff_pct:.1f}%.\n"
+    
+    return comp_df, comp_fig, resumen
+
+# =============================================================================
 # 6. Funciones adicionales para análisis integral y generación de reportes
 # =============================================================================
 def generate_hr_overview(df):
-    """
-    Genera un resumen con indicadores clave de RRHH.
-    
-    Retorna:
-        dict: Resumen con total de empleados, edad promedio, salario promedio, etc.
-    """
     overview = {}
     overview['total_employees'] = len(df)
     if 'Gender' in df.columns:
@@ -308,12 +538,6 @@ def generate_hr_overview(df):
     return overview
 
 def analyze_hr_data(df):
-    """
-    Integra los distintos análisis y retorna un diccionario con todos los resultados.
-    
-    Retorna:
-        dict: Con claves 'overview', 'demographic', 'contracts', 'salary' y 'attendance'.
-    """
     results = {}
     results['overview'] = generate_hr_overview(df)
     results['demographic'] = demographic_analysis(df)
@@ -323,17 +547,6 @@ def analyze_hr_data(df):
     return results
 
 def export_analysis_report(df, results, format='html'):
-    """
-    Exporta el reporte del análisis a un formato específico (por ejemplo, HTML o JSON).
-    
-    Args:
-        df (DataFrame): Datos procesados.
-        results (dict): Resultados de los análisis.
-        format (str): 'html' o 'json'.
-        
-    Retorna:
-        str: Reporte en el formato solicitado.
-    """
     try:
         if format == 'html':
             html_report = io.StringIO()
@@ -366,25 +579,20 @@ def export_analysis_report(df, results, format='html'):
 # 7. Ejecución principal para pruebas locales
 # =============================================================================
 if __name__ == "__main__":
-    # Reemplazar 'sample_data.xlsx' por la ruta de tu archivo de datos
     df = load_hr_data('sample_data.xlsx')
     if df is not None:
         print("Datos cargados y procesados correctamente.")
-        # Análisis integral
         results = analyze_hr_data(df)
         print("\nResumen General:")
         for key, value in results['overview'].items():
             print(f"{key}: {value}")
-        # Mostrar gráficos (se abrirán en ventanas si se ejecuta en entorno gráfico)
         results['demographic'].show()
         results['contracts'].show()
         results['salary'].show()
         results['attendance'].show()
-        # Exportar reporte HTML
         reporte_html = export_analysis_report(df, results, format='html')
         with open('reporte_rrhh.html', 'w', encoding='utf-8') as f:
             f.write(reporte_html)
-        # Guardar datos procesados en CSV
         df.to_csv('datos_procesados.csv', index=False)
         print("\nReporte generado: 'reporte_rrhh.html'")
         print("Datos procesados guardados en 'datos_procesados.csv'")
