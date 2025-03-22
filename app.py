@@ -11,59 +11,48 @@ from analisis_hr import (
     analyze_grupo_diagnostico_LME,
     analyze_duracion_LME,
     absenteeism_analysis,      # Se importa la función de ausentismo
-    absenteeism_comparison     # Se importa la función para comparativa
+    absenteeism_comparison,    # Se importa la función para comparativa
+    chatbot_response         # Nueva función para respuesta del chatbot
 )
-# Configuración de página y tema
-st.set_page_config(
-    page_title="Análisis RRHH",
-    page_icon="👥",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-#########################
-# Función de Convalidación de Licencias (Nuevo)
-#########################
-def convalidacion_licencias(df):
-    st.markdown("### Convalidación de Licencias")
-    st.write("Esta función agrupa los días de licencia acumulados por empleado en un mismo período y calcula el monto a pagar, considerando un mínimo de días según la ley de Chile.")
-    # Se solicita mapear las siguientes columnas:
-    req = {
-        "EmployeeID": "Seleccione la columna que identifica al empleado (p.ej., Rut o Nombre Completo):",
-        "BaseSalary": "Seleccione la columna para el Salario Base:",
-        "LicenseDays": "Seleccione la columna para los Días de Licencia (por ejemplo, Licencia Común):",
-        "Period": "Seleccione la columna que representa el período (YYYYMM):"
-    }
-    mapping = mapping_dinamico_por_dato(df, req)
-    if len(mapping) == len(req):
-        df_conv = df.copy()
-        # Convertir a numérico los campos necesarios
-        df_conv["BaseSalary"] = pd.to_numeric(df_conv[mapping["BaseSalary"]], errors="coerce")
-        df_conv["LicenseDays"] = pd.to_numeric(df_conv[mapping["LicenseDays"]], errors="coerce")
-        # Asegurarse de tener el campo de período
-        if "Period" not in df_conv.columns:
-            df_conv["Period"] = df_conv[mapping["Period"]]
-        # Agrupar por empleado y período, sumando los días de licencia; se toma el salario base (se asume constante en el grupo)
-        grouped = df_conv.groupby([mapping["EmployeeID"], "Period"]).agg({
-            "LicenseDays": "sum",
-            "BaseSalary": "first"
-        }).reset_index()
-        # Permitir definir el mínimo de días a pagar según la ley (valor configurable)
-        min_days = st.number_input("Ingrese la cantidad mínima de días de licencia a pagar (según la ley de Chile)", min_value=0, value=5)
-        # Calcular el valor diario: se asume que el salario es mensual y se divide por 30
-        grouped["DailyWage"] = grouped["BaseSalary"] / 30
-        # Si la suma de días de licencia es menor al mínimo, se utiliza el mínimo; de lo contrario se paga el total acumulado
-        grouped["LicenciaPagadaDias"] = grouped["LicenseDays"].apply(lambda x: max(x, min_days))
-        grouped["PagoLicencia"] = grouped["LicenciaPagadaDias"] * grouped["DailyWage"]
-        st.markdown("#### Resultados de Convalidación de Licencias")
-        st.dataframe(grouped)
-        total_payment = grouped["PagoLicencia"].sum()
-        st.markdown(f"**Pago Total de Licencias en el período:** ${total_payment:,.2f}")
-    else:
-        st.info("Complete el mapeo para la convalidación de licencias.")
 
-#########################
-# Funciones del Dashboard
-#########################
+###############################
+# Funciones para el Chatbot
+###############################
+
+def init_chat_history():
+    if 'chat_history' not in st.session_state:
+        st.session_state.chat_history = []
+
+def get_bot_response(user_message):
+    # Llama a la función importada de analisis_hr
+    return chatbot_response(user_message)
+
+def chatbot_interface():
+    st.markdown("## Chatbot")
+    init_chat_history()
+    
+    # Mostrar historial del chat
+    for msg in st.session_state.chat_history:
+        if msg['sender'] == 'user':
+            st.markdown(f"**Usuario:** {msg['message']}")
+        else:
+            st.markdown(f"**Bot:** {msg['message']}")
+    
+    # Entrada del usuario
+    user_input = st.text_input("Escribe tu mensaje:", key="user_input")
+    if st.button("Enviar"):
+        if user_input:
+            st.session_state.chat_history.append({"sender": "user", "message": user_input})
+            response = get_bot_response(user_input)
+            st.session_state.chat_history.append({"sender": "bot", "message": response})
+            # Limpiar la entrada y forzar recarga para actualizar el historial
+            st.session_state.user_input = ""
+            st.experimental_rerun()
+
+###############################
+# Funciones del Dashboard (ya existentes)
+###############################
+
 def inject_css():
     st.markdown("""
     <style>
@@ -122,12 +111,12 @@ def setup_sidebar():
     st.sidebar.markdown("### 📁 Datos")
     with st.sidebar.expander("ℹ️ Cómo usar esta aplicación", expanded=False):
         st.write("""
-        1. Suba su archivo CSV o Excel.
-        2. Use los filtros para seleccionar el período deseado.
-        3. Elija el tipo de análisis que desea visualizar.
-        4. Si es necesario, realice el mapeo de columnas para adaptar los datos.
+        1. Sube tu archivo CSV o Excel.
+        2. Usa los filtros para seleccionar el período deseado.
+        3. Elige el tipo de análisis que deseas visualizar.
+        4. Si es necesario, realiza el mapeo de columnas para adaptar los datos.
         """)
-    uploaded_file = st.sidebar.file_uploader("Suba su archivo de datos", type=["csv", "xlsx"],
+    uploaded_file = st.sidebar.file_uploader("Sube tu archivo de datos", type=["csv", "xlsx"],
                                                help="Formatos soportados: CSV y Excel (.xlsx)")
     return uploaded_file
 
@@ -277,7 +266,6 @@ def display_analysis(df):
                     st.plotly_chart(salary_analysis(df_salarial), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para análisis Salarial.")
-            # Nueva opción: Convalidación de Licencias
             if st.checkbox("Realizar Convalidación de Licencias", key="convalidar"):
                 convalidacion_licencias(df)
         
@@ -304,23 +292,19 @@ def display_analysis(df):
         
         elif analysis_key == "LME":
             st.write("Análisis de Licencias Médicas Electrónicas (LME)")
-            # Opciones LME reducidas
             lme_options = ["Total LME", "Grupo Diagnóstico", "Duración Promedio"]
             lme_choice = st.selectbox("Seleccione subanálisis LME:", lme_options)
             
-            # Selección del método para mapear 'Tipo de Licencia'
             metodo_tipo = st.radio("Método para mapear 'Tipo de Licencia':", 
                                      options=["Directo desde columna", "Transformar columnas (múltiples)"],
                                      key="metodo_tipo")
             if metodo_tipo == "Transformar columnas (múltiples)":
-                # Opción para transformar columnas de diagnóstico sin modificar el Excel original
                 transform_diag = st.checkbox("Transformar columnas de diagnóstico (formato ancho a largo)", key="transform_diag")
                 if transform_diag:
                     diag_cols = st.multiselect("Seleccione las columnas que contienen diagnósticos", options=list(df.columns))
                     if diag_cols:
                         df_lme = df.copy()
                         id_vars = [col for col in df_lme.columns if col not in diag_cols]
-                        # Se transforma: el nombre de la columna se usará como 'Tipo de Licencia' y el valor se asigna a 'Cantidad'
                         df_lme = pd.melt(df_lme, id_vars=id_vars, value_vars=diag_cols,
                                          var_name="Tipo de Licencia", value_name="Cantidad")
                         if st.checkbox("Mapear columnas para análisis LME (Transformación)", key="mapeo_lme_transf"):
@@ -354,7 +338,6 @@ def display_analysis(df):
                 else:
                     st.info("Active la opción de transformación para mapear 'Tipo de Licencia' desde columnas.")
             else:
-                # Método directo: mapear 'Tipo de Licencia' desde una columna existente
                 if st.checkbox("Mapear columnas para análisis LME", key="mapeo_lme_directo"):
                     requeridos_lme = {
                         "Tipo de Licencia": "Seleccione la columna para el Tipo de Licencia:",
@@ -385,7 +368,6 @@ def display_analysis(df):
                     else:
                         st.info("Seleccione todas las columnas requeridas para el análisis de LME.")
                 else:
-                    # Si no se realiza el mapeo, se utilizan datos por defecto
                     if lme_choice == "Total LME":
                         pivot, fig = analyze_total_LME(df)
                         st.dataframe(pivot)
@@ -479,61 +461,72 @@ def display_analysis(df):
             st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
             if analysis_key == "Demográfico":
                 st.markdown("""
-                - Distribución por género: Evalúe el balance en la organización.
-                - Distribución por edad: Observe cómo se agrupa la plantilla.
-                - Diversidad cultural: Analice la procedencia de los empleados.
+                - Distribución por género: Evalúa el balance en la organización.
+                - Distribución por edad: Observa cómo se agrupa la plantilla.
+                - Diversidad cultural: Analiza la procedencia de los empleados.
                 """)
             elif analysis_key == "Contratos":
                 st.markdown("""
-                - Tipos de contrato predominantes: Compare la distribución.
-                - Departamentos: Relacione el tipo de contrato con el área.
+                - Tipos de contrato predominantes: Compara la distribución.
+                - Departamentos: Relaciona el tipo de contrato con el área.
                 """)
             elif analysis_key == "Salarial":
                 st.markdown("""
-                - Comparación salarial: Revise diferencias entre departamentos.
-                - Identificación de brechas: Detecte posibles inequidades.
-                - **Convalidación de Licencias:** Calcule cuánto se pagará por licencia médica acumulada, aplicando un mínimo de días a pagar.
+                - Comparación salarial: Revisa diferencias entre departamentos.
+                - Identificación de brechas: Detecta posibles inequidades.
+                - **Convalidación de Licencias:** Calcula cuánto se pagará por licencia médica acumulada, aplicando un mínimo de días a pagar.
                 """)
             elif analysis_key == "Asistencia":
                 st.markdown("""
-                - Patrones de asistencia: Identifique áreas con mayor ausentismo.
-                - Correlaciones: Analice la relación entre asistencia y otros factores.
+                - Patrones de asistencia: Identifica áreas con mayor ausentismo.
+                - Correlaciones: Analiza la relación entre asistencia y otros factores.
                 """)
             elif analysis_key == "LME":
                 st.markdown("""
-                - Evolución de LME: Compare la cantidad total de licencias emitidas por año.
-                - Grupo Diagnóstico: Identifique cuáles diagnósticos son más frecuentes.
-                - Duración Promedio: Analice la duración promedio de las licencias por grupo diagnóstico.
+                - Evolución de LME: Compara la cantidad total de licencias emitidas por año.
+                - Grupo Diagnóstico: Identifica cuáles diagnósticos son más frecuentes.
+                - Duración Promedio: Analiza la duración promedio de las licencias por grupo diagnóstico.
                 """)
             elif analysis_key == "Ausentismo":
                 st.markdown("""
-                - Evolución mensual: Observe cómo cambian los días de ausentismo a lo largo del tiempo.
-                - Tipos de ausencia: Revise qué tipo de ausencia representa mayor porcentaje.
-                - Comparativa: Compare datos entre dos períodos y detecte diferencias estadísticas.
+                - Evolución mensual: Observa cómo cambian los días de ausentismo a lo largo del tiempo.
+                - Tipos de ausencia: Revisa qué tipo de ausencia representa mayor porcentaje.
+                - Comparativa: Compara datos entre dos períodos y detecta diferencias estadísticas.
                 """)
             st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+###############################
+# Función principal modificada
+###############################
+
 def main():
     inject_css()
     display_header()
-    uploaded_file = setup_sidebar()
-    if uploaded_file:
-        try:
-            with st.spinner("Procesando datos..."):
-                df = load_hr_data(uploaded_file)
-                filtered_df = setup_period_filters(df)
-                if filtered_df.empty:
-                    st.error("No hay datos para el período seleccionado. Ajuste los filtros.")
-                    return
-                display_key_metrics(filtered_df)
-                display_analysis(filtered_df)
-        except Exception as e:
-            st.error(f"Error al procesar los datos: {str(e)}")
-            st.info("Verifique que el archivo tenga el formato correcto y las columnas necesarias.")
+    
+    # Agregamos una opción en la barra lateral para elegir entre Dashboard y Chatbot
+    app_mode = st.sidebar.radio("Selecciona la sección:", ["Dashboard", "Chatbot"])
+    
+    if app_mode == "Chatbot":
+        chatbot_interface()
     else:
-        st.info("Por favor, suba un archivo Excel o CSV para iniciar el análisis.")
+        uploaded_file = setup_sidebar()
+        if uploaded_file:
+            try:
+                with st.spinner("Procesando datos..."):
+                    df = load_hr_data(uploaded_file)
+                    filtered_df = setup_period_filters(df)
+                    if filtered_df.empty:
+                        st.error("No hay datos para el período seleccionado. Ajusta los filtros.")
+                        return
+                    display_key_metrics(filtered_df)
+                    display_analysis(filtered_df)
+            except Exception as e:
+                st.error(f"Error al procesar los datos: {str(e)}")
+                st.info("Verifica que el archivo tenga el formato correcto y las columnas necesarias.")
+        else:
+            st.info("Por favor, sube un archivo Excel o CSV para iniciar el análisis.")
 
 if __name__ == "__main__":
     main()
