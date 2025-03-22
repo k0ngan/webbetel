@@ -56,6 +56,12 @@ STANDARD_COLUMN_SYNONYMS = {
     'BaseSalary': ['sueldo bruto contractual'],
     'DaysWorked': ['días trabajados']
 }
+def chatbot_response(user_message):
+    """
+    Función dummy que retorna una respuesta básica. 
+    Aquí podrías integrar una llamada a un API o modelo para obtener una respuesta más compleja.
+    """
+    return f"Respuesta del Chatbot: {user_message}"
 
 # =============================================================================
 # 3. Funciones de normalización y estandarización
