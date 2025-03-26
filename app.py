@@ -1,3 +1,168 @@
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+# Configurar la pestaña: título y logo (favicon)
+st.set_page_config(page_title="RR.HH", page_icon="👥")
+
+# Se importan las funciones de análisis desde analisis_hr.py
+from analisis_hr import (
+    load_hr_data, 
+    demographic_analysis, 
+    contract_analysis, 
+    salary_analysis, 
+    attendance_analysis,
+    analyze_total_LME,
+    analyze_grupo_diagnostico_LME,
+    analyze_duracion_LME,
+    absenteeism_analysis,      
+    absenteeism_comparison
+)
+
+##########################################
+# Función para mapear columnas dinámicamente
+##########################################
+def mapping_dinamico_por_dato(df, requeridos):
+    mapeo = {}
+    st.markdown("### Asignación de Columnas")
+    for key, mensaje in requeridos.items():
+        opcion = st.selectbox(mensaje, options=["-- Seleccione --"] + list(df.columns), key=key)
+        if opcion != "-- Seleccione --":
+            mapeo[key] = opcion
+    return mapeo
+
+##########################################
+# Inyección de CSS personalizado
+##########################################
+def inject_css():
+    st.markdown("""
+    <style>
+    body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; color: #333; }
+    .main-header {
+        background: linear-gradient(90deg, #28a745, #20c997);
+        color: white; padding: 1.5rem; border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem; text-align: center;
+    }
+    .dashboard-card {
+        background-color: white; padding: 1.5rem; border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1.5rem; transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+    .section-title {
+        color: #28a745; border-bottom: 2px solid #e9ecef;
+        padding-bottom: 0.5rem; margin-bottom: 1rem; font-weight: 600;
+    }
+    .sidebar-header {
+        background: linear-gradient(90deg, #28a745, #20c997);
+        color: white; padding: 1rem; border-radius: 5px;
+        margin-bottom: 1rem; text-align: center;
+    }
+    .stButton>button {
+        background-color: #28a745; color: white; border: none;
+        border-radius: 5px; padding: 0.5rem 1rem; font-weight: 500;
+        transition: all 0.2s;
+    }
+    .stButton>button:hover {
+        background-color: #218838; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+##########################################
+# Encabezado del dashboard
+##########################################
+def display_header():
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown("""
+        <div class="main-header">
+            <img src="https://betel-website.s3.us-east-2.amazonaws.com/logos.png" width="120">
+            <h1>Dashboard de Recursos Humanos</h1>
+            <p>Análisis completo para toma de decisiones estratégicas</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+##########################################
+# Configuración de la barra lateral
+##########################################
+def setup_sidebar():
+    st.sidebar.markdown("""
+    <div class="sidebar-header">
+        <h3>Control de Panel</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    st.sidebar.markdown("### 📁 Datos")
+    with st.sidebar.expander("ℹ️ Cómo usar esta aplicación", expanded=False):
+        st.write("""
+        1. Suba su archivo CSV o Excel.
+        2. Use los filtros para seleccionar el período deseado.
+        3. Elija el tipo de análisis que desea visualizar.
+        4. Si es necesario, realice el mapeo de columnas para adaptar los datos.
+        """)
+    uploaded_file = st.sidebar.file_uploader("Suba su archivo de datos", type=["csv", "xlsx"],
+                                               help="Formatos soportados: CSV y Excel (.xlsx)")
+    return uploaded_file
+
+##########################################
+# Configuración de filtros de período
+##########################################
+def setup_period_filters(df):
+    st.sidebar.markdown("### ⏱️ Filtros Temporales")
+    if 'Período' not in df.columns and 'ContractStartDate' in df.columns:
+        df['Período'] = df['ContractStartDate'].dt.strftime("%Y%m")
+        st.sidebar.info("Se creó el campo 'Período' a partir de 'ContractStartDate'")
+    if 'Período' in df.columns:
+        df['Período'] = df['Período'].astype(str)
+        unique_years = sorted(set([p[:4] for p in df['Período'] if len(p) >= 6]))
+        unique_months = sorted(set([p[4:6] for p in df['Período'] if len(p) >= 6]))
+        month_names = {"01": "Enero", "02": "Febrero", "03": "Marzo", "04": "Abril",
+                       "05": "Mayo", "06": "Junio", "07": "Julio", "08": "Agosto",
+                       "09": "Septiembre", "10": "Octubre", "11": "Noviembre", "12": "Diciembre"}
+        month_options = ["Todos"] + [f"{month_names.get(m, m)} ({m})" for m in unique_months]
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            selected_year = st.selectbox("Año", options=["Todos"] + unique_years)
+        with col2:
+            selected_month_display = st.selectbox("Mes", options=month_options)
+        selected_month = "Todos" if selected_month_display == "Todos" else selected_month_display.split("(")[1].strip(")")
+        filtered_df = df.copy()
+        if selected_year != "Todos":
+            filtered_df = filtered_df[filtered_df['Período'].str.startswith(selected_year)]
+        if selected_month != "Todos":
+            filtered_df = filtered_df[filtered_df['Período'].str.endswith(selected_month)]
+        st.sidebar.markdown(f"**Registros mostrados:** {len(filtered_df):,}")
+        return filtered_df
+    else:
+        st.sidebar.warning("No se encontró la columna 'Período'.")
+        return df
+
+##########################################
+# Visualización de métricas clave
+##########################################
+def display_key_metrics(df):
+    st.markdown('<h3 class="section-title">📊 Métricas Clave</h3>', unsafe_allow_html=True)
+    metrics_cols = st.columns(4)
+    with metrics_cols[0]:
+        st.markdown(f"<div class='metric-card'><div class='metric-value'>{len(df)}</div><div class='metric-label'>Total Empleados</div></div>", unsafe_allow_html=True)
+    with metrics_cols[1]:
+        active = len(df[df.get('Status', pd.Series()) == 'Active']) if 'Status' in df.columns else "N/A"
+        st.markdown(f"<div class='metric-card'><div class='metric-value'>{active}</div><div class='metric-label'>Empleados Activos</div></div>", unsafe_allow_html=True)
+    with metrics_cols[2]:
+        avg_salary = df['Salary'].mean() if 'Salary' in df.columns else "N/A"
+        salary_display = "${:,.2f}".format(avg_salary) if isinstance(avg_salary, (int, float)) else avg_salary
+        st.markdown(f"<div class='metric-card'><div class='metric-value'>{salary_display}</div><div class='metric-label'>Salario Promedio</div></div>", unsafe_allow_html=True)
+    with metrics_cols[3]:
+        departments = df['Department'].nunique() if 'Department' in df.columns else "N/A"
+        st.markdown(f"<div class='metric-card'><div class='metric-value'>{departments}</div><div class='metric-label'>Departamentos</div></div>", unsafe_allow_html=True)
+
+##########################################
+# Función principal de visualización de análisis
+##########################################
 def display_analysis(df):
     analysis_options = {
         "📋 Datos Procesados": "Datos Procesados",
@@ -8,7 +173,6 @@ def display_analysis(df):
         "📈 Análisis LME": "LME",
         "📉 Análisis de Ausentismo": "Ausentismo"
     }
-    st.set_page_config(page_title="RR.HH", page_icon="👥")
     st.sidebar.markdown("### 📈 Tipo de Análisis")
     selected_analysis = st.sidebar.radio("Seleccione qué desea visualizar:", list(analysis_options.keys()))
     analysis_key = analysis_options[selected_analysis]
@@ -327,3 +491,30 @@ def display_analysis(df):
             st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
+
+
+##########################################
+# Función principal
+##########################################
+def main():
+    inject_css()
+    display_header()
+    uploaded_file = setup_sidebar()
+    if uploaded_file:
+        try:
+            with st.spinner("Procesando datos..."):
+                df = load_hr_data(uploaded_file)
+                filtered_df = setup_period_filters(df)
+                if filtered_df.empty:
+                    st.error("No hay datos para el período seleccionado. Ajuste los filtros.")
+                    return
+                display_key_metrics(filtered_df)
+                display_analysis(filtered_df)
+        except Exception as e:
+            st.error(f"Error al procesar los datos: {str(e)}")
+            st.info("Verifique que el archivo tenga el formato correcto y las columnas necesarias.")
+    else:
+        st.info("Por favor, suba un archivo Excel o CSV para iniciar el análisis.")
+
+if __name__ == "__main__":
+    main()
