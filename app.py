@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Configurar la pestaña: título y logo (favicon)
+# Configuración de la página (título y favicon)
 st.set_page_config(page_title="RR.HH", page_icon="👥")
 
-# Se importan las funciones de análisis desde analisis_hr.py
+# Se importan funciones de análisis (suponiendo que las tienes definidas en analisis_hr.py)
 from analisis_hr import (
     load_hr_data, 
     demographic_analysis, 
@@ -31,6 +31,50 @@ def mapping_dinamico_por_dato(df, requeridos):
         if opcion != "-- Seleccione --":
             mapeo[key] = opcion
     return mapeo
+
+##########################################
+# Función para mostrar el resumen de RR.HH.
+##########################################
+def display_summary(df):
+    # Eliminamos duplicados asumiendo que 'ID_Empleado' identifica a cada empleado de forma única
+    df_unicos = df.drop_duplicates(subset="ID_Empleado")
+    
+    # 1. Total de empleados (únicos)
+    total_empleados = df_unicos.shape[0]
+    
+    # 2. Empleados activos: 
+    #    Se consideran activos aquellos con "Causal de Término" igual a "sin definir" (en minúsculas)
+    #    y cuya "Fecha de Término Contrato" sea NaN.
+    df_activos = df_unicos[
+        (df_unicos["Causal de Término"].str.lower() == "sin definir") &
+        (df_unicos["Fecha de Término Contrato"].isna())
+    ]
+    empleados_activos = df_activos.shape[0]
+    
+    # 3. Desvinculados / Despidos: 
+    #    Se consideran desvinculados cuando "Causal de Término" no es "sin definir" o la "Fecha de Término Contrato" NO es NaN.
+    df_desvinculados = df_unicos[
+        (df_unicos["Causal de Término"].str.lower() != "sin definir") |
+        (df_unicos["Fecha de Término Contrato"].notna())
+    ]
+    despidos_total = df_desvinculados.shape[0]
+    
+    # 4. Salario promedio (se calcula sobre los empleados activos)
+    salario_promedio = df_activos["Salario"].mean()
+    
+    # 5. Número de departamentos únicos
+    num_departamentos = df_unicos["Departamento"].nunique()
+    
+    # Construimos el diccionario resumen y luego el DataFrame
+    resumen = {
+         "Total Empleados": [total_empleados],
+         "Empleados Activos": [empleados_activos],
+         "Despidos": [despidos_total],
+         "Salario Promedio": [salario_promedio],
+         "Departamentos": [num_departamentos]
+    }
+    df_resumen = pd.DataFrame(resumen)
+    st.dataframe(df_resumen)
 
 ##########################################
 # Inyección de CSS personalizado
@@ -142,7 +186,7 @@ def setup_period_filters(df):
         return df
 
 ##########################################
-# Visualización de métricas clave
+# Visualización de métricas clave (ya existentes)
 ##########################################
 def display_key_metrics(df):
     st.markdown('<h3 class="section-title">📊 Métricas Clave</h3>', unsafe_allow_html=True)
@@ -164,6 +208,7 @@ def display_key_metrics(df):
 # Función principal de visualización de análisis
 ##########################################
 def display_analysis(df):
+    # Se agregan las opciones de análisis; se incluye una nueva opción para el resumen de RR.HH.
     analysis_options = {
         "📋 Datos Procesados": "Datos Procesados",
         "👥 Análisis Demográfico": "Demográfico",
@@ -171,7 +216,8 @@ def display_analysis(df):
         "💰 Análisis Salarial": "Salarial",
         "⏰ Análisis de Asistencia": "Asistencia",
         "📈 Análisis LME": "LME",
-        "📉 Análisis de Ausentismo": "Ausentismo"
+        "📉 Análisis de Ausentismo": "Ausentismo",
+        "📝 Resumen RRHH": "Resumen RRHH"
     }
     st.sidebar.markdown("### 📈 Tipo de Análisis")
     selected_analysis = st.sidebar.radio("Seleccione qué desea visualizar:", list(analysis_options.keys()))
@@ -181,7 +227,12 @@ def display_analysis(df):
     with st.container():
         st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
         
-        if analysis_key == "Datos Procesados":
+        # Opción para el resumen de RR.HH.
+        if analysis_key == "Resumen RRHH":
+            st.write("Resumen de RR.HH. (empleados únicos, activos, despidos, salario promedio y departamentos)")
+            display_summary(df)
+        
+        elif analysis_key == "Datos Procesados":
             st.write("Datos procesados y normalizados listos para análisis")
             search_term = st.text_input("🔍 Buscar en los datos:", "")
             displayed_df = df[df.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)] if search_term else df
@@ -254,7 +305,6 @@ def display_analysis(df):
                     st.plotly_chart(salary_analysis(df_salarial), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para análisis Salarial.")
-            # Nueva opción: Convalidación de Licencias
             if st.checkbox("Realizar Convalidación de Licencias", key="convalidar"):
                 convalidacion_licencias(df)
         
@@ -281,23 +331,18 @@ def display_analysis(df):
         
         elif analysis_key == "LME":
             st.write("Análisis de Licencias Médicas Electrónicas (LME)")
-            # Opciones LME reducidas
             lme_options = ["Total LME", "Grupo Diagnóstico", "Duración Promedio"]
             lme_choice = st.selectbox("Seleccione subanálisis LME:", lme_options)
-            
-            # Selección del método para mapear 'Tipo de Licencia'
             metodo_tipo = st.radio("Método para mapear 'Tipo de Licencia':", 
                                      options=["Directo desde columna", "Transformar columnas (múltiples)"],
                                      key="metodo_tipo")
             if metodo_tipo == "Transformar columnas (múltiples)":
-                # Opción para transformar columnas de diagnóstico sin modificar el Excel original
                 transform_diag = st.checkbox("Transformar columnas de diagnóstico (formato ancho a largo)", key="transform_diag")
                 if transform_diag:
                     diag_cols = st.multiselect("Seleccione las columnas que contienen diagnósticos", options=list(df.columns))
                     if diag_cols:
                         df_lme = df.copy()
                         id_vars = [col for col in df_lme.columns if col not in diag_cols]
-                        # Se transforma: el nombre de la columna se usará como 'Tipo de Licencia' y el valor se asigna a 'Cantidad'
                         df_lme = pd.melt(df_lme, id_vars=id_vars, value_vars=diag_cols,
                                          var_name="Tipo de Licencia", value_name="Cantidad")
                         if st.checkbox("Mapear columnas para análisis LME (Transformación)", key="mapeo_lme_transf"):
@@ -331,7 +376,6 @@ def display_analysis(df):
                 else:
                     st.info("Active la opción de transformación para mapear 'Tipo de Licencia' desde columnas.")
             else:
-                # Método directo: mapear 'Tipo de Licencia' desde una columna existente
                 if st.checkbox("Mapear columnas para análisis LME", key="mapeo_lme_directo"):
                     requeridos_lme = {
                         "Tipo de Licencia": "Seleccione la columna para el Tipo de Licencia:",
@@ -362,7 +406,6 @@ def display_analysis(df):
                     else:
                         st.info("Seleccione todas las columnas requeridas para el análisis de LME.")
                 else:
-                    # Si no se realiza el mapeo, se utilizan datos por defecto
                     if lme_choice == "Total LME":
                         pivot, fig = analyze_total_LME(df)
                         st.dataframe(pivot)
@@ -392,7 +435,7 @@ def display_analysis(df):
                         df_abs['Período'] = df_abs['ContractStartDate'].dt.strftime("%Y%m")
                     if mapeo["AbsenceDays"] != "AbsenceDays":
                         df_abs = df_abs.rename(columns={mapeo["AbsenceDays"]: "AbsenceDays"})
-
+                    
                     agg_df, figs, texto_resumen = absenteeism_analysis(df_abs)
                     if agg_df is not None:
                         st.markdown(texto_resumen)
@@ -492,6 +535,39 @@ def display_analysis(df):
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+##########################################
+# Función de Convalidación de Licencias
+##########################################
+def convalidacion_licencias(df):
+    st.markdown("### Convalidación de Licencias")
+    st.write("Esta función agrupa los días de licencia acumulados por empleado en un mismo período y calcula el monto a pagar, considerando un mínimo de días según la ley de Chile.")
+    req = {
+        "EmployeeID": "Seleccione la columna que identifica al empleado (p.ej., Rut o Nombre Completo):",
+        "BaseSalary": "Seleccione la columna para el Salario Base:",
+        "LicenseDays": "Seleccione la columna para los Días de Licencia (por ejemplo, Licencia Común):",
+        "Period": "Seleccione la columna que representa el período (YYYYMM):"
+    }
+    mapping = mapping_dinamico_por_dato(df, req)
+    if len(mapping) == len(req):
+        df_conv = df.copy()
+        df_conv["BaseSalary"] = pd.to_numeric(df_conv[mapping["BaseSalary"]], errors="coerce")
+        df_conv["LicenseDays"] = pd.to_numeric(df_conv[mapping["LicenseDays"]], errors="coerce")
+        if "Period" not in df_conv.columns:
+            df_conv["Period"] = df_conv[mapping["Period"]]
+        grouped = df_conv.groupby([mapping["EmployeeID"], "Period"]).agg({
+            "LicenseDays": "sum",
+            "BaseSalary": "first"
+        }).reset_index()
+        min_days = st.number_input("Ingrese la cantidad mínima de días de licencia a pagar (según la ley de Chile)", min_value=0, value=5)
+        grouped["DailyWage"] = grouped["BaseSalary"] / 30
+        grouped["LicenciaPagadaDias"] = grouped["LicenseDays"].apply(lambda x: max(x, min_days))
+        grouped["PagoLicencia"] = grouped["LicenciaPagadaDias"] * grouped["DailyWage"]
+        st.markdown("#### Resultados de Convalidación de Licencias")
+        st.dataframe(grouped)
+        total_payment = grouped["PagoLicencia"].sum()
+        st.markdown(f"**Pago Total de Licencias en el período:** ${total_payment:,.2f}")
+    else:
+        st.info("Complete el mapeo para la convalidación de licencias.")
 
 ##########################################
 # Función principal
@@ -500,6 +576,7 @@ def main():
     inject_css()
     display_header()
     uploaded_file = setup_sidebar()
+    
     if uploaded_file:
         try:
             with st.spinner("Procesando datos..."):
@@ -514,7 +591,8 @@ def main():
             st.error(f"Error al procesar los datos: {str(e)}")
             st.info("Verifique que el archivo tenga el formato correcto y las columnas necesarias.")
     else:
-        st.info("Por favor, suba un archivo Excel o CSV para iniciar el análisis.")
+        st.info("Por favor, suba un archivo para iniciar el análisis o conecte a una base de datos.")
+        # Aquí podrías agregar código para conectar a una base de datos, si lo deseas.
 
 if __name__ == "__main__":
     main()
