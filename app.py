@@ -30,7 +30,7 @@ def mapping_dinamico_por_dato(df, requeridos):
     return mapeo
 
 ##########################################
-# Función para inyectar CSS personalizado
+# Inyección de CSS personalizado
 ##########################################
 def inject_css():
     st.markdown("""
@@ -71,7 +71,7 @@ def inject_css():
     """, unsafe_allow_html=True)
 
 ##########################################
-# Función para mostrar el encabezado del dashboard
+# Encabezado del dashboard
 ##########################################
 def display_header():
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -85,7 +85,7 @@ def display_header():
         """, unsafe_allow_html=True)
 
 ##########################################
-# Función para configurar la barra lateral
+# Configuración de la barra lateral
 ##########################################
 def setup_sidebar():
     st.sidebar.markdown("""
@@ -101,13 +101,12 @@ def setup_sidebar():
         3. Elija el tipo de análisis que desea visualizar.
         4. Si es necesario, realice el mapeo de columnas para adaptar los datos.
         """)
-    # Subida de archivo con datos
     uploaded_file = st.sidebar.file_uploader("Suba su archivo de datos", type=["csv", "xlsx"],
                                                help="Formatos soportados: CSV y Excel (.xlsx)")
     return uploaded_file
 
 ##########################################
-# Función para configurar filtros de período
+# Configuración de filtros de período
 ##########################################
 def setup_period_filters(df):
     st.sidebar.markdown("### ⏱️ Filtros Temporales")
@@ -140,7 +139,7 @@ def setup_period_filters(df):
         return df
 
 ##########################################
-# Función para mostrar métricas clave
+# Visualización de métricas clave
 ##########################################
 def display_key_metrics(df):
     st.markdown('<h3 class="section-title">📊 Métricas Clave</h3>', unsafe_allow_html=True)
@@ -162,7 +161,6 @@ def display_key_metrics(df):
 # Función principal de visualización de análisis
 ##########################################
 def display_analysis(df):
-    # Opciones de análisis disponibles en la barra lateral
     analysis_options = {
         "📋 Datos Procesados": "Datos Procesados",
         "👥 Análisis Demográfico": "Demográfico",
@@ -181,25 +179,20 @@ def display_analysis(df):
         st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
         
         ##########################################
-        # Sección: Datos Procesados
+        # Datos Procesados
         ##########################################
         if analysis_key == "Datos Procesados":
             st.write("Datos procesados y normalizados listos para análisis")
-            
             # Filtro para agrupar datos por usuario (evitando duplicados)
             if st.checkbox("Mostrar datos únicos agrupados por usuario"):
                 st.markdown("### Agrupación por Usuario (sumatoria de columnas numéricas)")
-                # Se selecciona la columna que identifica al usuario
                 user_id_col = st.selectbox("Seleccione la columna de identificación de usuario:", options=list(df.columns))
-                # Se identifican las columnas numéricas para sumar
                 numeric_cols = df.select_dtypes(include='number').columns.tolist()
                 if user_id_col in numeric_cols:
                     numeric_cols.remove(user_id_col)
-                # Agrupar por usuario y sumar las columnas numéricas
                 df_grouped = df.groupby(user_id_col)[numeric_cols].sum().reset_index()
                 st.dataframe(df_grouped)
             
-            # Opción para buscar en los datos
             search_term = st.text_input("🔍 Buscar en los datos:", "")
             displayed_df = df[df.astype(str).apply(lambda x: x.str.contains(search_term, case=False)).any(axis=1)] if search_term else df
             page_size = st.selectbox("Registros por página:", [10, 20, 50, 100])
@@ -212,30 +205,34 @@ def display_analysis(df):
                                mime='text/csv')
         
         ##########################################
-        # Sección: Análisis Demográfico
+        # Análisis Demográfico
         ##########################################
         elif analysis_key == "Demográfico":
             st.write("Análisis Demográfico de Empleados")
-            # Ejemplo: Distribución por rangos de edad
+            # Distribución por rangos de edad
             if 'AgeGroup' in df.columns:
                 age_dist = df['AgeGroup'].value_counts().sort_index()
                 st.markdown("**Distribución por rangos de edad (tabla):**")
                 st.dataframe(age_dist.reset_index().rename(columns={'index':'Rango de Edad', 'AgeGroup':'Cantidad'}))
             
-            # Ejemplo: Distribución por género
+            # Distribución por género
             if 'Gender' in df.columns:
                 gender_dist = df['Gender'].value_counts()
                 st.markdown("**Distribución por género (tabla):**")
                 st.dataframe(gender_dist.reset_index().rename(columns={'index':'Género', 'Gender':'Cantidad'}))
             
-            # Se elimina el gráfico de nacionalidad y se muestra la distribución en porcentajes
+            # Distribución por nacionalidad en porcentajes (eliminamos el gráfico)
             if 'Nationality' in df.columns:
                 nat_dist = df['Nationality'].value_counts()
                 nat_pct = (nat_dist / nat_dist.sum() * 100).round(2)
                 st.markdown("**Distribución por Nacionalidad (porcentaje):**")
                 st.dataframe(nat_pct.reset_index().rename(columns={'index':'Nacionalidad', 'Nationality':'Porcentaje'}))
+                # Se extrae la nacionalidad mayoritaria y su porcentaje
+                max_nat = nat_pct.idxmax()
+                max_pct = nat_pct.max()
+                st.write(f"**La nacionalidad mayoritaria es {max_nat} con un {max_pct}% de los empleados.**")
             
-            # Opción para mapear columnas y reanalizar
+            # Opción para mapear columnas para análisis demográfico
             if st.checkbox("Mapear columnas para análisis Demográfico"):
                 req = {
                     "Edad": "Seleccione la columna para la Edad:",
@@ -263,16 +260,14 @@ def display_analysis(df):
                     st.info("Complete el mapeo para el análisis Demográfico.")
         
         ##########################################
-        # Sección: Análisis de Contratos
+        # Análisis de Contratos
         ##########################################
         elif analysis_key == "Contratos":
             st.write("Análisis de Contratos")
-            # Mostrar distribución de tipos de contrato en forma de tabla
             if 'ContractType' in df.columns:
                 contract_dist = df['ContractType'].value_counts()
                 st.markdown("**Distribución de Tipos de Contrato (tabla):**")
                 st.dataframe(contract_dist.reset_index().rename(columns={'index':'Tipo de Contrato', 'ContractType':'Cantidad'}))
-            # Mostrar contratos por departamento en tabla (si existen ambas columnas)
             if 'Department' in df.columns and 'ContractType' in df.columns:
                 contract_dept = pd.crosstab(df['Department'], df['ContractType'])
                 st.markdown("**Contratos por Departamento (tabla):**")
@@ -298,17 +293,22 @@ def display_analysis(df):
                     st.info("Complete el mapeo para análisis de Contratos.")
         
         ##########################################
-        # Sección: Análisis Salarial
+        # Análisis Salarial
         ##########################################
         elif analysis_key == "Salarial":
             st.write("Análisis Salarial")
-            # En vez de mostrar un gráfico, se muestra la distribución salarial por departamento en porcentajes
+            # En lugar del gráfico de distribución salarial por departamento,
+            # se calcula la suma de salarios por departamento y se muestra en porcentaje.
             if 'Department' in df.columns and 'BaseSalary' in df.columns:
                 df_clean = df.dropna(subset=['Department', 'BaseSalary']).copy()
                 dept_salary = df_clean.groupby('Department')['BaseSalary'].sum()
                 dept_salary_pct = (dept_salary / dept_salary.sum() * 100).round(2)
                 st.markdown("**Distribución Salarial por Departamento (porcentaje):**")
                 st.dataframe(dept_salary_pct.reset_index().rename(columns={'Department':'Departamento', 'BaseSalary':'Porcentaje'}))
+                # Se extrae el departamento con mayor suma salarial
+                max_dept = dept_salary_pct.idxmax()
+                max_dept_pct = dept_salary_pct.max()
+                st.write(f"**El departamento {max_dept} concentra el {max_dept_pct}% de la suma salarial.**")
             
             # Opción de mapeo para análisis salarial
             if st.checkbox("Mapear columnas para análisis Salarial"):
@@ -325,15 +325,18 @@ def display_analysis(df):
                     dept_salary_pct = (dept_salary / dept_salary.sum() * 100).round(2)
                     st.markdown("**Distribución Salarial por Departamento (porcentaje) - Datos Mapeados:**")
                     st.dataframe(dept_salary_pct.reset_index().rename(columns={'Department':'Departamento', 'BaseSalary':'Porcentaje'}))
+                    max_dept = dept_salary_pct.idxmax()
+                    max_dept_pct = dept_salary_pct.max()
+                    st.write(f"**El departamento {max_dept} concentra el {max_dept_pct}% de la suma salarial.**")
                 else:
                     st.info("Complete el mapeo para análisis Salarial.")
             
-            # Conservamos la opción de Convalidación de Licencias si se requiere
+            # Se conserva la opción de convalidación de licencias
             if st.checkbox("Realizar Convalidación de Licencias", key="convalidar"):
                 convalidacion_licencias(df)
         
         ##########################################
-        # Sección: Análisis de Asistencia
+        # Análisis de Asistencia
         ##########################################
         elif analysis_key == "Asistencia":
             st.write("Análisis de Asistencia")
@@ -367,7 +370,7 @@ def display_analysis(df):
                     st.info("Complete el mapeo para análisis de Asistencia.")
         
         ##########################################
-        # Sección: Análisis LME (Licencias Médicas Electrónicas)
+        # Análisis LME (Licencias Médicas Electrónicas)
         ##########################################
         elif analysis_key == "LME":
             st.write("Análisis de Licencias Médicas Electrónicas (LME)")
@@ -452,7 +455,6 @@ def display_analysis(df):
                     else:
                         st.info("Seleccione todas las columnas requeridas para el análisis de LME.")
                 else:
-                    # Si no se realiza mapeo, se usan datos por defecto
                     if lme_choice == "Total LME":
                         pivot, fig = analyze_total_LME(df)
                         st.markdown("**Tabla resumen Total LME (datos por defecto):**")
@@ -470,7 +472,7 @@ def display_analysis(df):
                         st.plotly_chart(fig, use_container_width=True)
         
         ##########################################
-        # Sección: Análisis de Ausentismo
+        # Análisis de Ausentismo
         ##########################################
         elif analysis_key == "Ausentismo":
             st.write("Análisis de Ausentismo")
@@ -494,8 +496,8 @@ def display_analysis(df):
                         st.markdown(texto_resumen)
                         st.markdown("**Tabla de Ausentismo (mapeada):**")
                         st.dataframe(agg_df)
-                        st.plotly_chart(figs[0], use_container_width=True)  # Barras apiladas
-                        st.plotly_chart(figs[1], use_container_width=True)  # Línea de evolución
+                        st.plotly_chart(figs[0], use_container_width=True)
+                        st.plotly_chart(figs[1], use_container_width=True)
                         pie_option = st.selectbox("Seleccione el gráfico de pastel a mostrar:", ["Absoluta", "Porcentual"], key="pie_sel")
                         st.plotly_chart(figs[2][pie_option], use_container_width=True)
                         
@@ -551,7 +553,7 @@ def display_analysis(df):
 
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Sección de insights clave (comentarios o recomendaciones)
+        # Insights Clave (comentarios o recomendaciones según el análisis)
         if analysis_key != "Datos Procesados":
             st.markdown('<h4 class="section-title">🔍 Insights Clave</h4>', unsafe_allow_html=True)
             st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
@@ -559,7 +561,7 @@ def display_analysis(df):
                 st.markdown("""
                 - Distribución por género: Evalúe el balance en la organización.
                 - Distribución por edad: Observe cómo se agrupa la plantilla.
-                - Diversidad cultural: Analice la procedencia de los empleados.
+                - Nacionalidad mayoritaria: Verifique si un grupo concentra un alto porcentaje (por ejemplo, 90%).
                 """)
             elif analysis_key == "Contratos":
                 st.markdown("""
@@ -570,6 +572,7 @@ def display_analysis(df):
                 st.markdown("""
                 - Comparación salarial: Revise diferencias entre departamentos.
                 - Identificación de brechas: Detecte posibles inequidades.
+                - Verificar si un departamento concentra la mayor parte del salario total.
                 """)
             elif analysis_key == "Asistencia":
                 st.markdown("""
@@ -593,7 +596,7 @@ def display_analysis(df):
     st.markdown('</div>', unsafe_allow_html=True)
 
 ##########################################
-# Función para la Convalidación de Licencias
+# Función de Convalidación de Licencias
 ##########################################
 def convalidacion_licencias(df):
     st.markdown("### Convalidación de Licencias")
@@ -607,7 +610,6 @@ def convalidacion_licencias(df):
     mapping = mapping_dinamico_por_dato(df, req)
     if len(mapping) == len(req):
         df_conv = df.copy()
-        # Convertir a numérico los campos necesarios
         df_conv["BaseSalary"] = pd.to_numeric(df_conv[mapping["BaseSalary"]], errors="coerce")
         df_conv["LicenseDays"] = pd.to_numeric(df_conv[mapping["LicenseDays"]], errors="coerce")
         if "Period" not in df_conv.columns:
@@ -631,16 +633,12 @@ def convalidacion_licencias(df):
 # Función principal
 ##########################################
 def main():
-    # Inyecta CSS personalizado
     inject_css()
-    # Muestra el encabezado del dashboard
     display_header()
-    # Configura la subida de archivo
     uploaded_file = setup_sidebar()
     if uploaded_file:
         try:
             with st.spinner("Procesando datos..."):
-                # Carga y procesa los datos (normalización, estandarización, etc.)
                 df = load_hr_data(uploaded_file)
                 filtered_df = setup_period_filters(df)
                 if filtered_df.empty:
