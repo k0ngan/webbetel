@@ -213,8 +213,30 @@ def display_analysis(df):
         
         elif analysis_key == "Demográfico":
             st.write("Análisis Demográfico de Empleados")
+            # --- Mostramos las tablas con las distribuciones numéricas ---
+            # Ejemplo: Conteo de grupos de edad
+            if 'AgeGroup' in df.columns:
+                age_dist = df['AgeGroup'].value_counts().sort_index()
+                st.markdown("**Distribución por rangos de edad (tabla):**")
+                st.dataframe(age_dist)
+            
+            # Ejemplo: Conteo de género
+            if 'Gender' in df.columns:
+                gender_dist = df['Gender'].value_counts()
+                st.markdown("**Distribución por género (tabla):**")
+                st.dataframe(gender_dist)
+
+            # Ejemplo: Conteo de nacionalidad
+            if 'Nationality' in df.columns:
+                nat_dist = df['Nationality'].value_counts()
+                st.markdown("**Distribución por nacionalidad (tabla):**")
+                st.dataframe(nat_dist)
+
+            # --- Gráfico original ---
             fig_default = demographic_analysis(df)
             st.plotly_chart(fig_default, use_container_width=True)
+
+            # Mapeo opcional
             if st.checkbox("Mapear columnas para análisis Demográfico"):
                 req = {
                     "Edad": "Seleccione la columna para la Edad:",
@@ -234,13 +256,32 @@ def display_analysis(df):
                     df_demo["Gender"] = df_demo[mapeo["Género"]]
                     df_demo["Nationality"] = df_demo[mapeo["Nacionalidad"]]
                     df_demo["TenureYears"] = pd.to_numeric(df_demo[mapeo["Antigüedad"]], errors="coerce")
+                    
+                    # --- Mostrar tablas con datos mapeados ---
+                    st.markdown("**Datos demográficos mapeados (tabla):**")
+                    st.dataframe(df_demo[[mapeo["Edad"], mapeo["Género"], mapeo["Nacionalidad"], mapeo["Antigüedad"]]].head(20))
+
+                    # --- Gráfico con datos mapeados ---
                     st.plotly_chart(demographic_analysis(df_demo), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para el análisis Demográfico.")
         
         elif analysis_key == "Contratos":
             st.write("Análisis de Contratos")
+            # --- Mostramos la distribución de tipos de contrato en tabla ---
+            if 'ContractType' in df.columns:
+                contract_dist = df['ContractType'].value_counts()
+                st.markdown("**Distribución de tipos de contrato (tabla):**")
+                st.dataframe(contract_dist)
+            if 'Department' in df.columns and 'ContractType' in df.columns:
+                contract_dept = pd.crosstab(df['Department'], df['ContractType'])
+                st.markdown("**Contratos por departamento (tabla):**")
+                st.dataframe(contract_dept)
+
+            # --- Gráfico original ---
             st.plotly_chart(contract_analysis(df), use_container_width=True)
+
+            # Mapeo opcional
             if st.checkbox("Mapear columnas para análisis de Contratos"):
                 req = {
                     "ContractType": "Seleccione la columna para el Tipo de Contrato:",
@@ -251,13 +292,29 @@ def display_analysis(df):
                     df_contrato = df.copy()
                     df_contrato["ContractType"] = df_contrato[mapeo["ContractType"]]
                     df_contrato["Department"] = df_contrato[mapeo["Department"]]
+
+                    # --- Mostrar tabla de datos mapeados ---
+                    crosstab_mapped = pd.crosstab(df_contrato["Department"], df_contrato["ContractType"])
+                    st.markdown("**Contratos mapeados (tabla):**")
+                    st.dataframe(crosstab_mapped)
+
+                    # --- Gráfico con datos mapeados ---
                     st.plotly_chart(contract_analysis(df_contrato), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para análisis de Contratos.")
         
         elif analysis_key == "Salarial":
             st.write("Análisis Salarial")
+            # --- Tabla con sueldos por departamento y banda ---
+            if 'Department' in df.columns and 'BaseSalary' in df.columns:
+                df_temp = df.dropna(subset=['Department','BaseSalary']).copy()
+                st.markdown("**Muestra de datos salariales (tabla):**")
+                st.dataframe(df_temp[['Department','BaseSalary']].head(20))
+
+            # --- Gráfico original ---
             st.plotly_chart(salary_analysis(df), use_container_width=True)
+
+            # Mapeo opcional
             if st.checkbox("Mapear columnas para análisis Salarial"):
                 req = {
                     "Department": "Seleccione la columna para el Departamento:",
@@ -268,16 +325,35 @@ def display_analysis(df):
                     df_salarial = df.copy()
                     df_salarial["Department"] = df_salarial[mapeo["Department"]]
                     df_salarial["BaseSalary"] = pd.to_numeric(df_salarial[mapeo["BaseSalary"]], errors="coerce")
+
+                    # --- Mostrar tabla mapeada ---
+                    st.markdown("**Datos salariales mapeados (tabla):**")
+                    st.dataframe(df_salarial[['Department','BaseSalary']].head(20))
+
+                    # --- Gráfico con datos mapeados ---
                     st.plotly_chart(salary_analysis(df_salarial), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para análisis Salarial.")
+
             # Nueva opción: Convalidación de Licencias
             if st.checkbox("Realizar Convalidación de Licencias", key="convalidar"):
                 convalidacion_licencias(df)
         
         elif analysis_key == "Asistencia":
             st.write("Análisis de Asistencia")
+            # --- Tabla con la media de días trabajados, ausencias, etc. ---
+            try:
+                if 'Department' in df.columns and 'DaysWorked' in df.columns and 'AbsenceDays' in df.columns:
+                    attendance_dept = df.groupby('Department')[['DaysWorked','AbsenceDays','VacationDays']].mean().reset_index()
+                    st.markdown("**Asistencia promedio por departamento (tabla):**")
+                    st.dataframe(attendance_dept)
+            except:
+                pass
+
+            # --- Gráfico original ---
             st.plotly_chart(attendance_analysis(df), use_container_width=True)
+
+            # Mapeo opcional
             if st.checkbox("Mapear columnas para análisis de Asistencia"):
                 req = {
                     "DaysWorked": "Seleccione la columna para Días Trabajados:",
@@ -292,6 +368,12 @@ def display_analysis(df):
                     if "Department" not in df_asistencia.columns:
                         st.error("La columna 'Department' es necesaria para agrupar el análisis de asistencia.")
                     else:
+                        # --- Tabla mapeada ---
+                        df_asistencia_dept = df_asistencia.groupby('Department')[['DaysWorked','AbsenceDays','VacationDays']].mean().reset_index()
+                        st.markdown("**Tabla de asistencia (mapeada):**")
+                        st.dataframe(df_asistencia_dept)
+
+                        # --- Gráfico ---
                         st.plotly_chart(attendance_analysis(df_asistencia), use_container_width=True)
                 else:
                     st.info("Complete el mapeo para análisis de Asistencia.")
@@ -307,16 +389,19 @@ def display_analysis(df):
                                      options=["Directo desde columna", "Transformar columnas (múltiples)"],
                                      key="metodo_tipo")
             if metodo_tipo == "Transformar columnas (múltiples)":
-                # Opción para transformar columnas de diagnóstico sin modificar el Excel original
                 transform_diag = st.checkbox("Transformar columnas de diagnóstico (formato ancho a largo)", key="transform_diag")
                 if transform_diag:
                     diag_cols = st.multiselect("Seleccione las columnas que contienen diagnósticos", options=list(df.columns))
                     if diag_cols:
                         df_lme = df.copy()
                         id_vars = [col for col in df_lme.columns if col not in diag_cols]
-                        # Se transforma: el nombre de la columna se usará como 'Tipo de Licencia' y el valor se asigna a 'Cantidad'
-                        df_lme = pd.melt(df_lme, id_vars=id_vars, value_vars=diag_cols,
-                                         var_name="Tipo de Licencia", value_name="Cantidad")
+                        df_lme = pd.melt(
+                            df_lme,
+                            id_vars=id_vars,
+                            value_vars=diag_cols,
+                            var_name="Tipo de Licencia",
+                            value_name="Cantidad"
+                        )
                         if st.checkbox("Mapear columnas para análisis LME (Transformación)", key="mapeo_lme_transf"):
                             requeridos_lme = {
                                 "Grupo Diagnóstico": "Seleccione la columna para el Grupo Diagnóstico:",
@@ -329,16 +414,21 @@ def display_analysis(df):
                                     df_lme[campo] = pd.to_numeric(df_lme[mapping_lme[campo]], errors="coerce")
                                 for campo in ["Grupo Diagnóstico", "Año"]:
                                     df_lme[campo] = df_lme[mapping_lme[campo]]
+                                
+                                # Ejecutamos el análisis y mostramos los resultados numéricos + el gráfico
                                 if lme_choice == "Total LME":
                                     pivot, fig = analyze_total_LME(df_lme)
+                                    st.markdown("**Tabla resumen Total LME**")
                                     st.dataframe(pivot)
                                     st.plotly_chart(fig, use_container_width=True)
                                 elif lme_choice == "Grupo Diagnóstico":
                                     pivot, fig = analyze_grupo_diagnostico_LME(df_lme)
+                                    st.markdown("**Tabla LME por Grupo Diagnóstico**")
                                     st.dataframe(pivot)
                                     st.plotly_chart(fig, use_container_width=True)
                                 elif lme_choice == "Duración Promedio":
                                     duracion, fig = analyze_duracion_LME(df_lme)
+                                    st.markdown("**Tabla de Duración Promedio**")
                                     st.dataframe(duracion)
                                     st.plotly_chart(fig, use_container_width=True)
                             else:
@@ -348,7 +438,6 @@ def display_analysis(df):
                 else:
                     st.info("Active la opción de transformación para mapear 'Tipo de Licencia' desde columnas.")
             else:
-                # Método directo: mapear 'Tipo de Licencia' desde una columna existente
                 if st.checkbox("Mapear columnas para análisis LME", key="mapeo_lme_directo"):
                     requeridos_lme = {
                         "Tipo de Licencia": "Seleccione la columna para el Tipo de Licencia:",
@@ -364,32 +453,39 @@ def display_analysis(df):
                             df_lme[campo] = pd.to_numeric(df_lme[mapping_lme[campo]], errors="coerce")
                         for campo in ["Tipo de Licencia", "Grupo Diagnóstico", "Año"]:
                             df_lme[campo] = df_lme[mapping_lme[campo]]
+                        
                         if lme_choice == "Total LME":
                             pivot, fig = analyze_total_LME(df_lme)
+                            st.markdown("**Tabla resumen Total LME**")
                             st.dataframe(pivot)
                             st.plotly_chart(fig, use_container_width=True)
                         elif lme_choice == "Grupo Diagnóstico":
                             pivot, fig = analyze_grupo_diagnostico_LME(df_lme)
+                            st.markdown("**Tabla LME por Grupo Diagnóstico**")
                             st.dataframe(pivot)
                             st.plotly_chart(fig, use_container_width=True)
                         elif lme_choice == "Duración Promedio":
                             duracion, fig = analyze_duracion_LME(df_lme)
+                            st.markdown("**Tabla de Duración Promedio**")
                             st.dataframe(duracion)
                             st.plotly_chart(fig, use_container_width=True)
                     else:
                         st.info("Seleccione todas las columnas requeridas para el análisis de LME.")
                 else:
-                    # Si no se realiza el mapeo, se utilizan datos por defecto
+                    # Sin mapeo, usar datos por defecto
                     if lme_choice == "Total LME":
                         pivot, fig = analyze_total_LME(df)
+                        st.markdown("**Tabla resumen Total LME (datos por defecto)**")
                         st.dataframe(pivot)
                         st.plotly_chart(fig, use_container_width=True)
                     elif lme_choice == "Grupo Diagnóstico":
                         pivot, fig = analyze_grupo_diagnostico_LME(df)
+                        st.markdown("**Tabla LME por Grupo Diagnóstico (datos por defecto)**")
                         st.dataframe(pivot)
                         st.plotly_chart(fig, use_container_width=True)
                     elif lme_choice == "Duración Promedio":
                         duracion, fig = analyze_duracion_LME(df)
+                        st.markdown("**Tabla de Duración Promedio (datos por defecto)**")
                         st.dataframe(duracion)
                         st.plotly_chart(fig, use_container_width=True)
         
@@ -413,9 +509,14 @@ def display_analysis(df):
                     agg_df, figs, texto_resumen = absenteeism_analysis(df_abs)
                     if agg_df is not None:
                         st.markdown(texto_resumen)
+                        
+                        # --- Mostrar la tabla de ausentismo ---
+                        st.markdown("**Tabla de ausentismo (mapeada):**")
                         st.dataframe(agg_df)
-                        st.plotly_chart(figs[0], use_container_width=True)
-                        st.plotly_chart(figs[1], use_container_width=True)
+
+                        # --- Gráficos ---
+                        st.plotly_chart(figs[0], use_container_width=True)  # Barras apiladas
+                        st.plotly_chart(figs[1], use_container_width=True)  # Línea evolución
                         pie_option = st.selectbox("Seleccione el gráfico de pastel a mostrar:", ["Absoluta", "Porcentual"], key="pie_sel")
                         st.plotly_chart(figs[2][pie_option], use_container_width=True)
                         
@@ -429,6 +530,7 @@ def display_analysis(df):
                         if st.button("Generar Comparativa"):
                             try:
                                 comp_df, comp_fig, comp_text = absenteeism_comparison(agg_df, period1, period2)
+                                st.markdown("**Tabla comparativa de ausentismo:**")
                                 st.dataframe(comp_df)
                                 st.plotly_chart(comp_fig, use_container_width=True)
                                 st.markdown(comp_text)
@@ -442,9 +544,14 @@ def display_analysis(df):
                 agg_df, figs, texto_resumen = absenteeism_analysis(df)
                 if agg_df is not None:
                     st.markdown(texto_resumen)
+                    
+                    # --- Mostrar la tabla ---
+                    st.markdown("**Tabla de ausentismo (sin mapeo adicional):**")
                     st.dataframe(agg_df)
-                    st.plotly_chart(figs[0], use_container_width=True)
-                    st.plotly_chart(figs[1], use_container_width=True)
+
+                    # --- Gráficos ---
+                    st.plotly_chart(figs[0], use_container_width=True)  # Barras apiladas
+                    st.plotly_chart(figs[1], use_container_width=True)  # Línea evolución
                     pie_option = st.selectbox("Seleccione el gráfico de pastel a mostrar:", ["Absoluta", "Porcentual"], key="pie_sel_std")
                     st.plotly_chart(figs[2][pie_option], use_container_width=True)
                     
@@ -458,6 +565,7 @@ def display_analysis(df):
                     if st.button("Generar Comparativa", key="comp_btn_std"):
                         try:
                             comp_df, comp_fig, comp_text = absenteeism_comparison(agg_df, period1, period2)
+                            st.markdown("**Tabla comparativa de ausentismo:**")
                             st.dataframe(comp_df)
                             st.plotly_chart(comp_fig, use_container_width=True)
                             st.markdown(comp_text)
@@ -508,6 +616,7 @@ def display_analysis(df):
             st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 def main():
     inject_css()
