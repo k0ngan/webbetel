@@ -188,8 +188,9 @@ def demographic_analysis(df):
         gender_dist = df['Gender'].value_counts()
         fig.add_trace(go.Pie(labels=gender_dist.index, values=gender_dist.values, name='Género'), row=1, col=2)
     if 'Nationality' in df.columns:
-        nat_dist = df['Nationality'].value_counts()
-        fig.add_trace(go.Bar(x=nat_dist.index.astype(str), y=nat_dist.values, name='Nacionalidad'), row=2, col=1)
+        # Convertimos el conteo a porcentaje
+        nat_pct = df['Nationality'].value_counts(normalize=True) * 100
+        fig.add_trace(go.Bar(x=nat_pct.index.astype(str), y=nat_pct.values, name='Nacionalidad (%)'), row=2, col=1)
     if 'Gender' in df.columns and 'TenureYears' in df.columns:
         tenure_by_gender = df.groupby('Gender')['TenureYears'].mean()
         fig.add_trace(go.Bar(x=tenure_by_gender.index, y=tenure_by_gender.values, name='Antigüedad'), row=2, col=2)
@@ -219,7 +220,7 @@ def contract_analysis(df):
 
 def salary_analysis(df):
     """
-    Análisis salarial.
+    Análisis salarial modificado para mostrar la distribución en porcentajes por Departamento.
     """
     try:
         if 'Department' not in df.columns or 'BaseSalary' not in df.columns:
@@ -231,18 +232,27 @@ def salary_analysis(df):
         df_clean = df_clean.dropna(subset=['SalaryBand'])
         if df_clean.empty:
             raise ValueError("No hay datos válidos para generar el gráfico")
-        fig = px.sunburst(
-            df_clean,
-            path=['Department', 'SalaryBand'],
-            values='BaseSalary',
-            color='BaseSalary',
-            color_continuous_scale='RdBu',
-            title='Distribución Salarial por Departamento'
+        
+        # Agrupamos por Departamento y SalaryBand y contamos la cantidad de empleados
+        df_counts = df_clean.groupby(['Department', 'SalaryBand']).size().reset_index(name='count')
+        # Calculamos el porcentaje respecto al total de empleados en cada departamento
+        df_counts['perc'] = df_counts.groupby('Department')['count'].transform(lambda x: x / x.sum() * 100)
+        
+        # Creamos un gráfico de barras apiladas para mostrar los porcentajes
+        fig = px.bar(
+            df_counts,
+            x='Department',
+            y='perc',
+            color='SalaryBand',
+            title='Distribución Salarial por Departamento (Porcentajes)',
+            labels={'perc': 'Porcentaje (%)'}
         )
+        fig.update_layout(barmode='stack', yaxis=dict(ticksuffix='%'))
         return fig
     except Exception as e:
         print(f"Error en análisis salarial: {str(e)}")
         return px.scatter(title="Error en datos salariales")
+
 
 def attendance_analysis(df):
     """
