@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-# Configuración de la página (título y favicon)
+# Configuración de la página: título y favicon
 st.set_page_config(page_title="RR.HH", page_icon="👥")
 
-# Se importan funciones de análisis (suponiendo que las tienes definidas en analisis_hr.py)
+# Se importan funciones de análisis (suponiendo que las tienes en analisis_hr.py)
 from analisis_hr import (
     load_hr_data, 
     demographic_analysis, 
@@ -36,36 +36,36 @@ def mapping_dinamico_por_dato(df, requeridos):
 # Función para mostrar el resumen de RR.HH.
 ##########################################
 def display_summary(df):
-    # Eliminamos duplicados asumiendo que 'ID_Empleado' identifica a cada empleado de forma única
-    df_unicos = df.drop_duplicates(subset="ID_Empleado")
+    # Se elimina duplicados usando "Rut" como identificador único
+    df_unicos = df.drop_duplicates(subset="Rut")
     
     # 1. Total de empleados (únicos)
     total_empleados = df_unicos.shape[0]
     
     # 2. Empleados activos: 
-    #    Se consideran activos aquellos con "Causal de Término" igual a "sin definir" (en minúsculas)
-    #    y cuya "Fecha de Término Contrato" sea NaN.
+    #    Consideramos activos aquellos con "Causal de Término" igual a "sin definir" (en minúsculas)
+    #    y con "Fecha de Término Contrato" vacía (NaN).
     df_activos = df_unicos[
         (df_unicos["Causal de Término"].str.lower() == "sin definir") &
         (df_unicos["Fecha de Término Contrato"].isna())
     ]
     empleados_activos = df_activos.shape[0]
     
-    # 3. Desvinculados / Despidos: 
-    #    Se consideran desvinculados cuando "Causal de Término" no es "sin definir" o la "Fecha de Término Contrato" NO es NaN.
+    # 3. Desvinculados / Despidos:
+    #    Aquellos que tengan "Causal de Término" diferente a "sin definir" o "Fecha de Término Contrato" no sea NaN.
     df_desvinculados = df_unicos[
         (df_unicos["Causal de Término"].str.lower() != "sin definir") |
         (df_unicos["Fecha de Término Contrato"].notna())
     ]
     despidos_total = df_desvinculados.shape[0]
     
-    # 4. Salario promedio (se calcula sobre los empleados activos)
-    salario_promedio = df_activos["Salario"].mean()
+    # 4. Salario promedio (de los empleados activos)
+    salario_promedio = df_activos["Sueldo Bruto Contractual"].mean()
     
-    # 5. Número de departamentos únicos
-    num_departamentos = df_unicos["Departamento"].nunique()
+    # 5. Número de departamentos únicos (utilizando "Gerencia")
+    num_departamentos = df_unicos["Gerencia"].nunique()
     
-    # Construimos el diccionario resumen y luego el DataFrame
+    # Construimos el resumen en un DataFrame
     resumen = {
          "Total Empleados": [total_empleados],
          "Empleados Activos": [empleados_activos],
@@ -157,9 +157,9 @@ def setup_sidebar():
 ##########################################
 def setup_period_filters(df):
     st.sidebar.markdown("### ⏱️ Filtros Temporales")
-    if 'Período' not in df.columns and 'ContractStartDate' in df.columns:
-        df['Período'] = df['ContractStartDate'].dt.strftime("%Y%m")
-        st.sidebar.info("Se creó el campo 'Período' a partir de 'ContractStartDate'")
+    if 'Período' not in df.columns and 'Fecha de Inicio Contrato' in df.columns:
+        df['Período'] = pd.to_datetime(df['Fecha de Inicio Contrato'], dayfirst=True, errors="coerce").dt.strftime("%Y%m")
+        st.sidebar.info("Se creó el campo 'Período' a partir de 'Fecha de Inicio Contrato'")
     if 'Período' in df.columns:
         df['Período'] = df['Período'].astype(str)
         unique_years = sorted(set([p[:4] for p in df['Período'] if len(p) >= 6]))
@@ -208,7 +208,7 @@ def display_key_metrics(df):
 # Función principal de visualización de análisis
 ##########################################
 def display_analysis(df):
-    # Se agregan las opciones de análisis; se incluye una nueva opción para el resumen de RR.HH.
+    # Se agregan las opciones de análisis, incluida la nueva opción para resumen de RR.HH.
     analysis_options = {
         "📋 Datos Procesados": "Datos Procesados",
         "👥 Análisis Demográfico": "Demográfico",
@@ -431,8 +431,8 @@ def display_analysis(df):
                     df_abs = df.copy()
                     if mapeo.get("Fecha") and mapeo["Fecha"] != "-- Seleccione --":
                         df_abs['Período'] = pd.to_datetime(df_abs[mapeo["Fecha"]], errors="coerce").dt.strftime("%Y%m")
-                    elif 'Período' not in df_abs.columns and 'ContractStartDate' in df_abs.columns:
-                        df_abs['Período'] = df_abs['ContractStartDate'].dt.strftime("%Y%m")
+                    elif 'Período' not in df_abs.columns and 'Fecha de Inicio Contrato' in df_abs.columns:
+                        df_abs['Período'] = pd.to_datetime(df_abs['Fecha de Inicio Contrato'], dayfirst=True, errors="coerce").dt.strftime("%Y%m")
                     if mapeo["AbsenceDays"] != "AbsenceDays":
                         df_abs = df_abs.rename(columns={mapeo["AbsenceDays"]: "AbsenceDays"})
                     
@@ -547,6 +547,7 @@ def convalidacion_licencias(df):
         "LicenseDays": "Seleccione la columna para los Días de Licencia (por ejemplo, Licencia Común):",
         "Period": "Seleccione la columna que representa el período (YYYYMM):"
     }
+    # Nota: Puedes mapear "EmployeeID" a "Rut" si lo prefieres.
     mapping = mapping_dinamico_por_dato(df, req)
     if len(mapping) == len(req):
         df_conv = df.copy()
