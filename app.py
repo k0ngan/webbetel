@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 # Configuración de la página: título y favicon
 st.set_page_config(page_title="RR.HH", page_icon="👥")
 
-# Se importan funciones de análisis (suponiendo que las tienes en analisis_hr.py)
+# Se importan funciones de análisis (suponiendo que las tienes definidas en analisis_hr.py)
 from analisis_hr import (
     load_hr_data, 
     demographic_analysis, 
@@ -42,9 +42,8 @@ def display_summary(df):
     # 1. Total de empleados (únicos)
     total_empleados = df_unicos.shape[0]
     
-    # 2. Empleados activos: 
-    #    Consideramos activos aquellos con "Causal de Término" igual a "sin definir" (en minúsculas)
-    #    y con "Fecha de Término Contrato" vacía (NaN).
+    # 2. Empleados activos:
+    #    Aquellos con "Causal de Término" igual a "sin definir" y "Fecha de Término Contrato" vacía (NaN)
     df_activos = df_unicos[
         (df_unicos["Causal de Término"].str.lower() == "sin definir") &
         (df_unicos["Fecha de Término Contrato"].isna())
@@ -52,7 +51,6 @@ def display_summary(df):
     empleados_activos = df_activos.shape[0]
     
     # 3. Desvinculados / Despidos:
-    #    Aquellos que tengan "Causal de Término" diferente a "sin definir" o "Fecha de Término Contrato" no sea NaN.
     df_desvinculados = df_unicos[
         (df_unicos["Causal de Término"].str.lower() != "sin definir") |
         (df_unicos["Fecha de Término Contrato"].notna())
@@ -62,10 +60,9 @@ def display_summary(df):
     # 4. Salario promedio (de los empleados activos)
     salario_promedio = df_activos["Sueldo Bruto Contractual"].mean()
     
-    # 5. Número de departamentos únicos (utilizando "Gerencia")
+    # 5. Número de departamentos únicos (usando "Gerencia")
     num_departamentos = df_unicos["Gerencia"].nunique()
     
-    # Construimos el resumen en un DataFrame
     resumen = {
          "Total Empleados": [total_empleados],
          "Empleados Activos": [empleados_activos],
@@ -208,7 +205,7 @@ def display_key_metrics(df):
 # Función principal de visualización de análisis
 ##########################################
 def display_analysis(df):
-    # Se agregan las opciones de análisis, incluida la nueva opción para resumen de RR.HH.
+    # Se agregan las opciones de análisis, incluida la opción para resumen de RR.HH.
     analysis_options = {
         "📋 Datos Procesados": "Datos Procesados",
         "👥 Análisis Demográfico": "Demográfico",
@@ -227,9 +224,9 @@ def display_analysis(df):
     with st.container():
         st.markdown('<div class="dashboard-card">', unsafe_allow_html=True)
         
-        # Opción para el resumen de RR.HH.
+        # Opción para el resumen de RRHH.
         if analysis_key == "Resumen RRHH":
-            st.write("Resumen de RR.HH. (empleados únicos, activos, despidos, salario promedio y departamentos)")
+            st.write("Resumen de RRHH. Se muestran empleados únicos, activos, despidos, salario promedio y departamentos.")
             display_summary(df)
         
         elif analysis_key == "Datos Procesados":
@@ -247,30 +244,15 @@ def display_analysis(df):
         
         elif analysis_key == "Demográfico":
             st.write("Análisis Demográfico de Empleados")
-            fig_default = demographic_analysis(df)
-            st.plotly_chart(fig_default, use_container_width=True)
-            if st.checkbox("Mapear columnas para análisis Demográfico"):
-                req = {
-                    "Edad": "Seleccione la columna para la Edad:",
-                    "Género": "Seleccione la columna para el Género:",
-                    "Nacionalidad": "Seleccione la columna para la Nacionalidad:",
-                    "Antigüedad": "Seleccione la columna para la Antigüedad (en años):"
-                }
-                mapeo = mapping_dinamico_por_dato(df, req)
-                if len(mapeo) == len(req):
-                    df_demo = df.copy()
-                    try:
-                        df_demo["AgeGroup"] = pd.cut(pd.to_numeric(df_demo[mapeo["Edad"]], errors="coerce"),
-                                                     bins=[18,25,35,45,55,65,100],
-                                                     labels=["18-24","25-34","35-44","45-54","55-64","65+"])
-                    except Exception as e:
-                        st.error("Error en la columna de Edad: " + str(e))
-                    df_demo["Gender"] = df_demo[mapeo["Género"]]
-                    df_demo["Nationality"] = df_demo[mapeo["Nacionalidad"]]
-                    df_demo["TenureYears"] = pd.to_numeric(df_demo[mapeo["Antigüedad"]], errors="coerce")
-                    st.plotly_chart(demographic_analysis(df_demo), use_container_width=True)
-                else:
-                    st.info("Complete el mapeo para el análisis Demográfico.")
+            # Se borra el gráfico de distribución por nacionalidad y se muestra una tabla
+            if "Nación" in df.columns:
+                nat_counts = df["Nación"].value_counts()
+                nat_pct = (nat_counts / nat_counts.sum() * 100).round(2)
+                st.markdown("**Distribución por Nacionalidad (tabla):**")
+                st.dataframe(nat_pct.reset_index().rename(columns={"index": "Nación", "Nación": "Porcentaje"}))
+            else:
+                st.error("No se encontró la columna 'Nación' para el análisis de nacionalidad.")
+            # Puedes agregar aquí otras tablas o gráficos para edad y género si lo deseas.
         
         elif analysis_key == "Contratos":
             st.write("Análisis de Contratos")
@@ -287,11 +269,18 @@ def display_analysis(df):
                     df_contrato["Department"] = df_contrato[mapeo["Department"]]
                     st.plotly_chart(contract_analysis(df_contrato), use_container_width=True)
                 else:
-                    st.info("Complete el mapeo para análisis de Contratos.")
+                    st.info("Complete el mapeo para el análisis de Contratos.")
         
         elif analysis_key == "Salarial":
             st.write("Análisis Salarial")
-            st.plotly_chart(salary_analysis(df), use_container_width=True)
+            # Se elimina el gráfico y se muestra una tabla de distribución salarial por departamento.
+            if "Gerencia" in df.columns and "Sueldo Bruto Contractual" in df.columns:
+                dept_salary = df.groupby("Gerencia")["Sueldo Bruto Contractual"].sum()
+                dept_salary_pct = (dept_salary / dept_salary.sum() * 100).round(2)
+                st.markdown("**Distribución Salarial por Departamento (tabla):**")
+                st.dataframe(dept_salary_pct.reset_index().rename(columns={"Gerencia": "Departamento", "Sueldo Bruto Contractual": "Porcentaje"}))
+            else:
+                st.error("No se encontraron las columnas necesarias para el análisis salarial.")
             if st.checkbox("Mapear columnas para análisis Salarial"):
                 req = {
                     "Department": "Seleccione la columna para el Departamento:",
@@ -302,7 +291,11 @@ def display_analysis(df):
                     df_salarial = df.copy()
                     df_salarial["Department"] = df_salarial[mapeo["Department"]]
                     df_salarial["BaseSalary"] = pd.to_numeric(df_salarial[mapeo["BaseSalary"]], errors="coerce")
-                    st.plotly_chart(salary_analysis(df_salarial), use_container_width=True)
+                    # Se agrupa por departamento y se calcula porcentaje de la suma salarial
+                    dept_salary = df_salarial.groupby("Department")["BaseSalary"].sum()
+                    dept_salary_pct = (dept_salary / dept_salary.sum() * 100).round(2)
+                    st.markdown("**Distribución Salarial por Departamento (tabla) - Datos Mapeados:**")
+                    st.dataframe(dept_salary_pct.reset_index().rename(columns={"Department": "Departamento", "BaseSalary": "Porcentaje"}))
                 else:
                     st.info("Complete el mapeo para análisis Salarial.")
             if st.checkbox("Realizar Convalidación de Licencias", key="convalidar"):
@@ -501,7 +494,7 @@ def display_analysis(df):
                 st.markdown("""
                 - Distribución por género: Evalúe el balance en la organización.
                 - Distribución por edad: Observe cómo se agrupa la plantilla.
-                - Diversidad cultural: Analice la procedencia de los empleados.
+                - Distribución por nacionalidad (tabla) para identificar grupos mayoritarios.
                 """)
             elif analysis_key == "Contratos":
                 st.markdown("""
@@ -512,7 +505,7 @@ def display_analysis(df):
                 st.markdown("""
                 - Comparación salarial: Revise diferencias entre departamentos.
                 - Identificación de brechas: Detecte posibles inequidades.
-                - **Convalidación de Licencias:** Calcule cuánto se pagará por licencia médica acumulada, aplicando un mínimo de días a pagar.
+                - Se muestra la distribución salarial por departamento en forma de tabla.
                 """)
             elif analysis_key == "Asistencia":
                 st.markdown("""
@@ -593,7 +586,6 @@ def main():
             st.info("Verifique que el archivo tenga el formato correcto y las columnas necesarias.")
     else:
         st.info("Por favor, suba un archivo para iniciar el análisis o conecte a una base de datos.")
-        # Aquí podrías agregar código para conectar a una base de datos, si lo deseas.
 
 if __name__ == "__main__":
     main()
