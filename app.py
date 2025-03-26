@@ -16,7 +16,7 @@ from analisis_hr import (
     absenteeism_analysis,      
     absenteeism_comparison
 )
-
+st.set_page_config(page_title="RR.HH", page_icon="👥")
 ##########################################
 # Función para mapear columnas dinámicamente
 ##########################################
