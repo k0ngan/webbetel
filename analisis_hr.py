@@ -70,6 +70,48 @@ def normalize_string(s):
     s = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
     return s
 
+def causales_analysis(df, causal_column="causal de termino"):
+    """
+    Análisis de Causales de Terminación:
+    Cuenta cuántos empleados están activos e inactivos.
+    Se asume que las personas activas tienen el valor "sin definir" en la columna indicada.
+    
+    Retorna:
+      - Un diccionario con el conteo de empleados activos e inactivos.
+      - Una tupla con dos figuras Plotly:
+          * Un gráfico de pastel mostrando la distribución.
+          * Un gráfico de barras mostrando los porcentajes.
+    """
+    if causal_column not in df.columns:
+        raise ValueError(f"La columna '{causal_column}' no se encontró en el DataFrame.")
+    
+    # Normalizamos la columna para evitar discrepancias en mayúsculas/minúsculas o espacios
+    df[causal_column] = df[causal_column].astype(str).str.lower().str.strip()
+    
+    activos = (df[causal_column] == 'sin definir').sum()
+    inactivos = (df[causal_column] != 'sin definir').sum()
+    total = activos + inactivos
+    data = {"Activos": activos, "Inactivos": inactivos}
+    
+    # Gráfico de pastel
+    fig_pie = px.pie(
+        names=list(data.keys()),
+        values=list(data.values()),
+        title="Distribución de Empleados (Causales)",
+        labels={"names": "Estado", "values": "Cantidad"}
+    )
+    
+    # Gráfico de barras con porcentajes
+    percentages = {k: (v / total * 100 if total > 0 else 0) for k, v in data.items()}
+    fig_bar = px.bar(
+        x=list(percentages.keys()),
+        y=list(percentages.values()),
+        title="Porcentaje de Empleados por Estado",
+        labels={"x": "Estado", "y": "Porcentaje (%)"}
+    )
+    
+    return data, (fig_pie, fig_bar)
+
 def standardize_column_names(df):
     """
     Revisa cada columna del DataFrame y, si su nombre (normalizado) coincide con alguno
