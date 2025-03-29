@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 import pandas as pd
 import time
@@ -34,6 +33,7 @@ def main():
             "Dotación",
             "Composición de Ausencias",
             "Empleados Activos (Corte)",
+            "Empleados Activos vs Inactivos",
             "Faltas por Cargo y Departamento"
         ]
     )
@@ -75,6 +75,7 @@ def main():
             "Días de Vacaciones": "DiasVacaciones",
             "Cargo": "Cargo",
             "Gerencia": "Gerencia",
+            "Causal de Término": "Causal de Término"
         }
         df = df.rename(columns=rename_map)
 
@@ -109,6 +110,9 @@ def main():
 
         elif analisis_opcion == "Empleados Activos (Corte)":
             analysis.empleados_activos(df)
+
+        elif analisis_opcion == "Empleados Activos vs Inactivos":
+            analysis.filtrar_empleados_activos_inactivos(df)
 
         elif analisis_opcion == "Faltas por Cargo y Departamento":
             analysis.faltas_por_cargo_y_departamento(df)
