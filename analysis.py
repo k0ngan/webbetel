@@ -1,4 +1,3 @@
-# analysis.py
 import streamlit as st
 import plotly.express as px
 import plotly.graph_objects as go
@@ -228,3 +227,56 @@ def faltas_por_cargo_y_departamento(df: pd.DataFrame):
         labels={"DiasFalta": "Total Días de Falta"}
     )
     st.plotly_chart(fig_faltas, use_container_width=True)
+
+def filtrar_empleados_activos_inactivos(df: pd.DataFrame):
+    st.header("Empleados Activos vs Inactivos")
+    # Verificar que la columna exista
+    if "Causal de Término" not in df.columns:
+        st.warning("La columna 'Causal de Término' no se encuentra en el DataFrame.")
+        return
+    # Lista de causales que indican inactividad
+    causales_inactivos = [
+        "Abandonar el trabajo en forma injustificada",
+        "Conclusión del trabajo o servicio que dio origen al contrato",
+        "Falta de probidad del trabajador en el desempeño de sus funciones",
+        "Incumplimiento grave de las obligaciones que impone el contrato",
+        "Muerte del trabajador",
+        "Mutuo acuerdo entre las partes",
+        "Necesidades de la empresa establecimiento o servicio",
+        "No concurrencia del trabajador a sus labores sin causa dos días seguidos",
+        "Renuncia del Trabajador",
+        "Vencimiento del plazo convenido en el contrato",
+        "Vías de hecho ejercidas por el trabajador en contra del empleador"
+    ]
+    # Asegurarse de que los valores no tengan espacios adicionales
+    df["Causal de Término"] = df["Causal de Término"].astype(str).str.strip()
+
+    # Filtrar empleados activos e inactivos
+    df_activos = df[df["Causal de Término"] == "Sin definir"]
+    df_inactivos = df[df["Causal de Término"].isin(causales_inactivos)]
+    
+    st.subheader("Empleados Activos")
+    st.write(f"Total activos: {df_activos.shape[0]}")
+    st.dataframe(df_activos.head(10))
+    
+    st.subheader("Empleados Inactivos")
+    st.write(f"Total inactivos: {df_inactivos.shape[0]}")
+    st.dataframe(df_inactivos.head(10))
+    
+    # Agrupar por Periodo y contar empleados (únicos según Rut)
+    activos_por_periodo = df_activos.groupby("Periodo")["Rut"].nunique().reset_index(name="Activos")
+    inactivos_por_periodo = df_inactivos.groupby("Periodo")["Rut"].nunique().reset_index(name="Inactivos")
+    
+    # Combinar ambos DataFrames para tener la comparación
+    df_comparacion = activos_por_periodo.merge(inactivos_por_periodo, on="Periodo", how="outer").fillna(0)
+    df_comparacion = df_comparacion.sort_values("Periodo")
+    
+    st.subheader("Comparación de Empleados Activos vs Inactivos en el Tiempo")
+    fig_comparacion = px.line(
+        df_comparacion,
+        x="Periodo",
+        y=["Activos", "Inactivos"],
+        title="Comparación de Empleados Activos vs Inactivos a lo largo del tiempo",
+        labels={"value": "Número de Empleados", "Periodo": "Período"}
+    )
+    st.plotly_chart(fig_comparacion, use_container_width=True)
