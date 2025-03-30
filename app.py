@@ -34,7 +34,8 @@ def main():
             "Composición de Ausencias",
             "Empleados Activos (Corte)",
             "Empleados Activos vs Inactivos",
-            "Faltas por Cargo y Departamento"
+            "Faltas por Cargo y Departamento",
+            "Causales de Término"
         ]
     )
 
@@ -79,6 +80,7 @@ def main():
         }
         df = df.rename(columns=rename_map)
 
+        analysis.show_key_metrics(df)
         # Procesa la columna "Periodo" para convertirla a datetime y extraer Año y Mes
         df = utils.process_period_column(df)
 
@@ -116,6 +118,9 @@ def main():
 
         elif analisis_opcion == "Faltas por Cargo y Departamento":
             analysis.faltas_por_cargo_y_departamento(df)
+        
+        elif analisis_opcion == "Causales de Término":
+            analysis.grafico_causales_termino(df)
     else:
         st.info("Por favor, sube un archivo para iniciar el análisis.")
 
