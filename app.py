@@ -20,7 +20,7 @@ def main():
 
     # Sidebar para carga de datos y menú de análisis
     st.sidebar.title("Control de Panel")
-    st.sidebar.subheader("📂 Carga de Datos")
+    st.sidebar.subheader("📂 Carga de Datos poto")
     uploaded_file = st.sidebar.file_uploader("Sube tu archivo (CSV/Excel)", type=["csv", "xlsx"])
     
     analisis_opcion = st.sidebar.radio(
